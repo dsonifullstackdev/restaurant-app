@@ -1,98 +1,140 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { Header } from '@/components/common/Header';
+import { SearchBar } from '@/components/common/SearchBar';
+import { CategoryMenu } from '@/components/home/CategoryMenu';
+import { PromoBanner } from '@/components/home/PromoBanner';
+import { ProductCard } from '@/components/product/ProductCard';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Spacing } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { useCategories } from '@/hooks/useCategories';
+import { useProducts } from '@/hooks/useProducts';
+import { t } from '@/i18n';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const background = useThemeColor({}, 'background');
+  const text = useThemeColor({}, 'text');
+  const primary = useThemeColor({}, 'primary');
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [searchInputValue, setSearchInputValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { categories, error: categoriesError, refetch: refetchCategories } = useCategories();
+  const { products, loading: productsLoading, error: productsError, refetch: refetchProducts } =
+    useProducts({
+      categoryId: selectedCategoryId,
+      searchQuery,
+    });
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchCategories(), refetchProducts()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchCategories, refetchProducts]);
+
+  const handleSearchSubmit = useCallback(() => {
+    setSearchQuery(searchInputValue.trim());
+  }, [searchInputValue]);
+
+  const handleSelectCategory = useCallback((categoryId: number | null) => {
+    setSelectedCategoryId(categoryId);
+  }, []);
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: background }]} edges={['top']}>
+      <Header />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={primary} />
+        }
+      >
+        <SearchBar
+          value={searchInputValue}
+          onChangeText={setSearchInputValue}
+          onSubmit={handleSearchSubmit}
+        />
+        <PromoBanner />
+        {categoriesError ? (
+          <ThemedText style={[styles.error, { color: text }]}>
+            {categoriesError.message}
+          </ThemedText>
+        ) : (
+          <CategoryMenu
+            categories={categories}
+            selectedId={selectedCategoryId}
+            onSelectCategory={handleSelectCategory}
+          />
+        )}
+        <View style={styles.section}>
+          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+            {t('home.popularNearYou')}
+          </ThemedText>
+          {productsError ? (
+            <ThemedText style={[styles.error, { color: text }]}>
+              {productsError.message}
+            </ThemedText>
+          ) : productsLoading ? (
+            <ActivityIndicator size="large" style={styles.loader} />
+          ) : products.length === 0 ? (
+            <ThemedText style={[styles.empty, { color: text }]}>
+              {t('products.empty')}
+            </ThemedText>
+          ) : (
+            products.map((product) => (
+              <ProductCard key={product.id} product={product} onPress={() => {}} />
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  scroll: {
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  scrollContent: {
+    paddingBottom: Spacing.xxxl,
+  },
+  section: {
+    paddingTop: Spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  loader: {
+    marginVertical: Spacing.xxl,
+  },
+  error: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  empty: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
   },
 });

@@ -1,0 +1,39 @@
+{
+  "home": {
+    "allCategories": "सभी",
+    "deliveryAddress": "घर",
+    "searchPlaceholder": "आप क्या खाना चाहेंगे?",
+    "promoTitle": "50% छूट",
+    "promoSubtitle": "पहला ऑर्डर",
+    "promoCta": "अभी ऑर्डर करें",
+    "popularNearYou": "आपके पास लोकप्रिय",
+    "forOne": "एक के लिए"
+  },
+  "categories": {
+    "pizza": "पिज़्ज़ा",
+    "burger": "बर्गर",
+    "sushi": "सushi",
+    "biryani": "बिरयानी",
+    "chinese": "चाइनीज़",
+    "healthy": "हेल्दी"
+  },
+  "tabs": {
+    "home": "होम",
+    "search": "खोज",
+    "orders": "ऑर्डर",
+    "profile": "प्रोफ़ाइल"
+  },
+  "orders": {
+    "emptyMessage": "आपके ऑर्डर यहाँ दिखेंगे।"
+  },
+  "profile": {
+    "emptyMessage": "प्रोफ़ाइल सेटिंग्स यहाँ दिखेंगी।"
+  },
+  "common": {
+    "min": "मिन",
+    "rating": "{{value}}"
+  },
+  "products": {
+    "empty": "कोई उत्पाद नहीं मिला।"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "home": {
+    "allCategories": "All",
+    "deliveryAddress": "Home",
+    "searchPlaceholder": "What would you like to eat?",
+    "promoTitle": "50% OFF",
+    "promoSubtitle": "First Order",
+    "promoCta": "Order Now",
+    "popularNearYou": "Popular Near You",
+    "forOne": "for one"
+  },
+  "categories": {
+    "pizza": "Pizza",
+    "burger": "Burger",
+    "sushi": "Sushi",
+    "biryani": "Biryani",
+    "chinese": "Chinese",
+    "healthy": "Healthy"
+  },
+  "tabs": {
+    "home": "Home",
+    "search": "Search",
+    "orders": "Orders",
+    "profile": "Profile"
+  },
+  "orders": {
+    "emptyMessage": "Your orders will appear here."
+  },
+  "profile": {
+    "emptyMessage": "Profile settings will appear here."
+  },
+  "common": {
+    "min": "min",
+    "rating": "{{value}}"
+  },
+  "products": {
+    "empty": "No products found."
+  }
+}

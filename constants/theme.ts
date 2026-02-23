@@ -5,8 +5,10 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorLight = '#E63946';
+const tintColorDark = '#FF6B6B';
+const primaryLight = '#E63946';
+const primaryDark = '#FF6B6B';
 
 export const Colors = {
   light: {
@@ -16,6 +18,10 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    primary: primaryLight,
+    primaryDark: '#C1121F',
+    surface: '#F5F5F5',
+    border: '#E5E5E5',
   },
   dark: {
     text: '#ECEDEE',
@@ -24,8 +30,41 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    primary: primaryDark,
+    primaryDark: '#E63946',
+    surface: '#25262B',
+    border: '#373A40',
   },
 };
+
+/** Design tokens: spacing, radius, typography. Use these instead of hardcoded values. */
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+} as const;
+
+export const BorderRadius = {
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
+  full: 9999,
+} as const;
+
+export const FontSize = {
+  xs: 12,
+  sm: 14,
+  base: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+  title: 28,
+} as const;
 
 export const Fonts = Platform.select({
   ios: {
