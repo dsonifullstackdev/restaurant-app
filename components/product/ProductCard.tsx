@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { t } from '@/i18n';
+import { useCartStore } from '@/store/cart.store';
 import type { WcProduct } from '@/types/api';
 
 type ProductCardProps = {
@@ -14,55 +14,126 @@ type ProductCardProps = {
 };
 
 function getProductImageUrl(product: WcProduct): string | null {
-  if (product.featured_src) return product.featured_src;
-  const images = product.images;
-  if (Array.isArray(images) && images.length > 0 && images[0].src) {
-    return images[0].src;
+  if (product.images?.length && product.images[0]?.src) {
+    return product.images[0].src;
   }
   return null;
 }
 
-function getProductName(product: WcProduct): string {
-  return (product.name ?? product.title ?? '').trim() || 'Product';
-}
-
-function getPrice(product: WcProduct): string {
-  const raw = product.price ?? product.regular_price ?? '';
-  if (typeof raw !== 'string') return '';
-  return raw;
+function formatPrice(value?: string) {
+  if (!value) return '';
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) return '';
+  return `₹${(parsed / 100).toFixed(0)}`;
 }
 
 export function ProductCard({ product, onPress }: ProductCardProps) {
   const surface = useThemeColor({}, 'surface');
   const text = useThemeColor({}, 'text');
+  const primary = useThemeColor({}, 'primary');
   const icon = useThemeColor({}, 'icon');
 
+  const addItem = useCartStore((state) => state.addItem);
+
   const imageUrl = getProductImageUrl(product);
-  const name = getProductName(product);
-  const priceStr = getPrice(product);
-  const priceLabel = priceStr ? `₹${priceStr} ${t('home.forOne')}` : '';
+
+  const salePrice = formatPrice(product.prices?.sale_price);
+  const regularPrice = formatPrice(product.prices?.regular_price);
+
+  const discount =
+    product.prices?.regular_price && product.prices?.sale_price
+      ? Math.round(
+          (1 -
+            parseInt(product.prices.sale_price) /
+              parseInt(product.prices.regular_price)) *
+            100
+        )
+      : null;
+
+  const handleAddToCart = async () => {
+    await addItem(product.id, 1);
+  };
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, { backgroundColor: surface }, pressed && styles.pressed]}
+      style={[styles.card, { backgroundColor: surface }]}
       onPress={onPress}
     >
-      <View style={styles.imageWrap}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} contentFit="cover" />
-        ) : (
-          <View style={[styles.imagePlaceholder, { backgroundColor: icon }]} />
-        )}
-      </View>
+      {/* LEFT CONTENT */}
       <View style={styles.body}>
-        <ThemedText style={[styles.name, { color: text }]} type="defaultSemiBold" numberOfLines={2}>
-          {name}
+        <ThemedText
+          style={[styles.name, { color: text }]}
+          type="defaultSemiBold"
+          numberOfLines={1}
+        >
+          {product.name}
         </ThemedText>
-        {priceLabel ? (
-          <ThemedText style={[styles.price, { color: text }]} type="defaultSemiBold">
-            {priceLabel}
+
+        {/* Price */}
+        <View style={styles.priceRow}>
+          {salePrice ? (
+            <>
+              <ThemedText style={[styles.salePrice, { color: text }]}>
+                {salePrice}
+              </ThemedText>
+
+              {regularPrice && (
+                <ThemedText
+                  style={[styles.regularPrice, { color: icon }]}
+                >
+                  {regularPrice}
+                </ThemedText>
+              )}
+            </>
+          ) : regularPrice ? (
+            <ThemedText style={[styles.salePrice, { color: text }]}>
+              {regularPrice}
+            </ThemedText>
+          ) : null}
+        </View>
+
+        {discount ? (
+          <ThemedText style={styles.discount}>
+            {discount}% OFF
           </ThemedText>
         ) : null}
+
+        {product.short_description ? (
+          <ThemedText
+            style={[styles.description, { color: icon }]}
+            numberOfLines={2}
+          >
+            {product.short_description.replace(/<[^>]+>/g, '')}
+          </ThemedText>
+        ) : null}
+      </View>
+
+      {/* IMAGE */}
+      <View style={styles.imageContainer}>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+          />
+        ) : (
+          <View
+            style={[
+              styles.imagePlaceholder,
+              { backgroundColor: icon },
+            ]}
+          />
+        )}
+
+        {/* ADD BUTTON */}
+        <Pressable
+          style={[styles.addButton, { borderColor: primary }]}
+          onPress={handleAddToCart}
+        >
+          <ThemedText style={[styles.addText, { color: primary }]}>
+            ADD
+          </ThemedText>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -71,40 +142,71 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
+    padding: Spacing.lg,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     gap: Spacing.lg,
+  },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  name: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  priceRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  pressed: {
-    opacity: 0.9,
+  salePrice: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-  imageWrap: {
-    width: 88,
-    height: 88,
+  regularPrice: {
+    fontSize: 13,
+    textDecorationLine: 'line-through',
+  },
+  discount: {
+    color: '#2979FF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginVertical: 4,
+  },
+  description: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  imageContainer: {
+    width: 110,
+    height: 110,
     borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: BorderRadius.lg,
   },
   imagePlaceholder: {
     width: '100%',
     height: '100%',
-    opacity: 0.25,
+    borderRadius: BorderRadius.lg,
+    opacity: 0.2,
   },
-  body: {
-    flex: 1,
-    minWidth: 0,
+  addButton: {
+    position: 'absolute',
+    bottom: -10,
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
   },
-  name: {
-    fontSize: 16,
-    marginBottom: Spacing.xs,
-  },
-  price: {
-    fontSize: 14,
+  addText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

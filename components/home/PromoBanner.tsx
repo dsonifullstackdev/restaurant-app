@@ -1,95 +1,199 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/common/Button';
 import { ThemedText } from '@/components/themed-text';
-import { BorderRadius, Spacing } from '@/constants/theme';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { t } from '@/i18n';
+import { Spacing } from '@/constants/theme';
+import type { WcBanner } from '@/types/api';
 
-export function PromoBanner() {
-  const primary = useThemeColor({}, 'primary');
-  const border = useThemeColor({}, 'border');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+type PromoBannerProps = {
+  banners: WcBanner[];
+};
+
+function getImageUrl(image: WcBanner['image']): string | null {
+  if (!image) return null;
+  if (typeof image === 'string') return image;
+  if (typeof image === 'object' && image?.src) return image.src;
+  return null;
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n\s*\n/g, '\n')
+    .trim();
+}
+
+export function PromoBanner({ banners }: PromoBannerProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const scrollToIndex = useCallback(
+    (index: number) => {
+      scrollRef.current?.scrollTo({
+        x: index * SCREEN_WIDTH,
+        animated: true,
+      });
+      setActiveIndex(index);
+    },
+    []
+  );
+
+  // Auto rotate every 3 seconds (1s is too fast to read)
+  useEffect(() => {
+    if (!banners?.length) return;
+
+    timerRef.current = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % banners.length;
+        scrollRef.current?.scrollTo({
+          x: next * SCREEN_WIDTH,
+          animated: true,
+        });
+        return next;
+      });
+    }, 3000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [banners?.length]);
+
+  const handleScroll = (e: any) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setActiveIndex(index);
+  };
+
+  if (!banners?.length) return null;
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.banner, { backgroundColor: primary }]}>
-        <View style={styles.content}>
-          <View style={styles.textBlock}>
-            <ThemedText style={styles.promoTitle}>{t('home.promoTitle')}</ThemedText>
-            <ThemedText style={styles.promoSubtitle}>{t('home.promoSubtitle')}</ThemedText>
-            <Button title={t('home.promoCta')} onPress={() => {}} style={styles.cta} />
-          </View>
-          <View style={styles.imageBlock}>
-            <View style={styles.imagePlaceholder} />
-          </View>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        onScrollBeginDrag={() => {
+          // Pause auto rotation when user drags
+          if (timerRef.current) clearInterval(timerRef.current);
+        }}
+        scrollEventThrottle={16}
+      >
+        {banners.map((banner) => {
+          const imageUrl = getImageUrl(banner.image);
+          const description = banner.description ? stripHtml(banner.description) : null;
+
+          return (
+            <View key={banner.id} style={styles.banner}>
+              {imageUrl ? (
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.placeholder} />
+              )}
+
+              <View style={styles.overlay} />
+
+              <View style={styles.content}>
+                <ThemedText style={styles.title} numberOfLines={2}>
+                  {banner.title}
+                </ThemedText>
+
+                {description ? (
+                  <ThemedText style={styles.description} numberOfLines={2}>
+                    {description}
+                  </ThemedText>
+                ) : banner.subtitle ? (
+                  <ThemedText style={styles.description} numberOfLines={2}>
+                    {banner.subtitle}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Dots */}
+      {banners.length > 1 && (
+        <View style={styles.dots}>
+          {banners.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === activeIndex ? styles.dotActive : styles.dotInactive,
+              ]}
+            />
+          ))}
         </View>
-      </View>
-      <View style={styles.dots}>
-        <View style={[styles.dot, styles.dotActive, { backgroundColor: primary }]} />
-        <View style={[styles.dot, { backgroundColor: border }]} />
-        <View style={[styles.dot, { backgroundColor: border }]} />
-      </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginHorizontal: Spacing.lg,
     marginBottom: Spacing.xl,
   },
   banner: {
-    borderRadius: BorderRadius.xl,
+    width: SCREEN_WIDTH,
+    height: 180,
     overflow: 'hidden',
-    minHeight: 140,
+  },
+  placeholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#ccc',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.40)',
   },
   content: {
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    alignItems: 'center',
     flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
   },
-  textBlock: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  promoTitle: {
-    fontSize: 28,
+  title: {
+    fontSize: 20,
     fontWeight: '800',
     color: '#fff',
     marginBottom: Spacing.xs,
   },
-  promoSubtitle: {
-    fontSize: 14,
+  description: {
+    fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
-    marginBottom: Spacing.md,
-  },
-  cta: {
-    alignSelf: 'flex-start',
-  },
-  imageBlock: {
-    width: 120,
-    height: 120,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    lineHeight: 18,
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: Spacing.xs,
     marginTop: Spacing.sm,
   },
   dot: {
-    width: 6,
     height: 6,
     borderRadius: 3,
   },
-  dotActive: {},
+  dotActive: {
+    width: 18,
+    backgroundColor: '#FF6B35',
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: '#ccc',
+  },
 });

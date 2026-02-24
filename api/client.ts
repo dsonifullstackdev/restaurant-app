@@ -1,31 +1,47 @@
 /**
  * Centralized Axios client for WooCommerce Store API.
- * Store API (wc/store/v1) is public and does not require API keys for product/category listing.
+ * Handles Store API Nonce automatically.
  */
 
-import axios, { type AxiosInstance } from 'axios';
+import axios, {
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 
 import { AppConfig } from '@/config/app.config';
 
 const baseURL = `${AppConfig.API_BASE_URL.replace(/\/$/, '')}${AppConfig.WC_API_PATH}`;
 
+let cartToken: string | null = null;
+
+export const setCartToken = (token: string | null) => {
+  cartToken = token;
+};
+
 function createClient(): AxiosInstance {
   const client = axios.create({
     baseURL,
     timeout: 20000,
+    withCredentials: true,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
       'ngrok-skip-browser-warning': 'true',
     },
   });
 
+  client.interceptors.request.use(
+    (config: InternalAxiosRequestConfig) => {
+      if (cartToken && config.headers) {
+        config.headers.set('Cart-Token', cartToken);
+      }
+      return config;
+    }
+  );
+
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      if (error.response?.status === 401) {
-        // Optional: trigger logout or auth flow
-      }
       return Promise.reject(error);
     }
   );

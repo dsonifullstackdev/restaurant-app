@@ -1,7 +1,7 @@
-import { Image } from 'expo-image';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Image } from 'expo-image';
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, Pressable, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
@@ -15,6 +15,9 @@ type CategoryMenuProps = {
   onSelectCategory: (categoryId: number | null) => void;
 };
 
+/* 🔥 Increased size by 15% */
+const CATEGORY_ICON_SIZE = 80; // was 48
+
 function getCategoryImageUrl(cat: WcProductCategory): string | null {
   if (!cat.image) return null;
   if (typeof cat.image === 'string') return cat.image;
@@ -22,29 +25,36 @@ function getCategoryImageUrl(cat: WcProductCategory): string | null {
   return null;
 }
 
-export function CategoryMenu({ categories, selectedId, onSelectCategory }: CategoryMenuProps) {
+export function CategoryMenu({
+  categories,
+  selectedId,
+  onSelectCategory,
+}: CategoryMenuProps) {
   const primary = useThemeColor({}, 'primary');
   const icon = useThemeColor({}, 'icon');
   const surface = useThemeColor({}, 'surface');
 
   const renderAll = useCallback(() => {
     const isSelected = selectedId === null;
+
     return (
       <Pressable
         key="all"
         style={[
           styles.item,
           { backgroundColor: isSelected ? primary : surface },
+
         ]}
         onPress={() => onSelectCategory(null)}
       >
-        <View style={[styles.iconWrap, { backgroundColor: 'transparent' }]}>
+        <View style={styles.iconWrap}>
           <MaterialIcons
             name="apps"
-            size={28}
+            size={32}
             color={isSelected ? '#fff' : primary}
           />
         </View>
+
         <ThemedText
           style={[styles.label, { color: isSelected ? '#fff' : icon }]}
           numberOfLines={1}
@@ -59,6 +69,7 @@ export function CategoryMenu({ categories, selectedId, onSelectCategory }: Categ
     (cat: WcProductCategory) => {
       const isSelected = selectedId === cat.id;
       const imageUrl = getCategoryImageUrl(cat);
+
       return (
         <Pressable
           key={cat.id}
@@ -68,17 +79,22 @@ export function CategoryMenu({ categories, selectedId, onSelectCategory }: Categ
           ]}
           onPress={() => onSelectCategory(cat.id)}
         >
-          <View style={[styles.iconWrap, { backgroundColor: 'transparent' }]}>
+          <View style={styles.iconWrap}>
             {imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.categoryImage} contentFit="cover" />
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.categoryImage}
+                contentFit="cover"
+              />
             ) : (
               <MaterialIcons
                 name="category"
-                size={28}
+                size={32}
                 color={isSelected ? '#fff' : primary}
               />
             )}
           </View>
+
           <ThemedText
             style={[styles.label, { color: isSelected ? '#fff' : icon }]}
             numberOfLines={1}
@@ -115,27 +131,27 @@ const styles = StyleSheet.create({
   },
   item: {
     alignItems: 'center',
-    width: 72,
+    minWidth: 100, // 🔥 increased container width (important)
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.sm,
   },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: CATEGORY_ICON_SIZE,
+    height: CATEGORY_ICON_SIZE,
+    borderRadius: CATEGORY_ICON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.xs,
     overflow: 'hidden',
   },
   categoryImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: CATEGORY_ICON_SIZE,
+    height: CATEGORY_ICON_SIZE,
+    borderRadius: CATEGORY_ICON_SIZE / 2,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
   },
 });

@@ -65,3 +65,24 @@ export interface ProductListParams {
   search?: string;
   category?: number;
 }
+
+// banner contents
+
+export type BannerImage =
+  | string
+  | {
+      id?: number;
+      src: string;
+    };
+
+export type WcBanner = {
+  id: number;
+  title: string;
+  subtitle?: string;
+  buttonText?: string;
+  image?: BannerImage;
+};
+
+export type WcBannersResponse = {
+  banners?: WcBanner[];
+};

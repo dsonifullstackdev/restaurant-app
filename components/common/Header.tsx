@@ -5,9 +5,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppConfig } from '@/config/app.config';
-import { BorderRadius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { t } from '@/i18n';
+import { useCartStore } from '@/store/cart.store';
 
 export function Header() {
   const primary = useThemeColor({}, 'primary');
@@ -15,25 +16,70 @@ export function Header() {
   const icon = useThemeColor({}, 'icon');
   const router = useRouter();
 
+  const cartCount = useCartStore((state) => state.cartCount);
+
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.logo, { color: primary }]} type="defaultSemiBold">
+      {/* App Name */}
+      <ThemedText
+        style={[styles.logo, { color: primary }]}
+        type="defaultSemiBold"
+      >
         {AppConfig.APP_NAME}
       </ThemedText>
-      <Pressable style={styles.location} onPress={() => {}} accessibilityLabel={t('home.deliveryAddress')}>
+
+      {/* Location */}
+      <Pressable
+        style={styles.location}
+        onPress={() => {}}
+        accessibilityLabel={t('home.deliveryAddress')}
+      >
         <MaterialIcons name="location-on" size={18} color={icon} />
-        <ThemedText style={[styles.locationText, { color: text }]} numberOfLines={1}>
+        <ThemedText
+          style={[styles.locationText, { color: text }]}
+          numberOfLines={1}
+        >
           {t('home.deliveryAddress')}
         </ThemedText>
         <MaterialIcons name="keyboard-arrow-down" size={20} color={icon} />
       </Pressable>
-      <Pressable
-        style={styles.notification}
-        onPress={() => {}}
-        accessibilityLabel="Notifications"
-      >
-        <MaterialIcons name="notifications-none" size={24} color={icon} />
-      </Pressable>
+
+      {/* Right Icons */}
+      <View style={styles.rightIcons}>
+        {/* Notification */}
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => {}}
+          accessibilityLabel="Notifications"
+        >
+          <MaterialIcons
+            name="notifications-none"
+            size={24}
+            color={icon}
+          />
+        </Pressable>
+
+        {/* Cart Icon */}
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => router.push('/cart')}
+          accessibilityLabel="Cart"
+        >
+          <MaterialIcons
+            name="shopping-cart"
+            size={24}
+            color={icon}
+          />
+
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+              <ThemedText style={styles.badgeText}>
+                {cartCount}
+              </ThemedText>
+            </View>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -61,7 +107,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  notification: {
+  rightIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  iconButton: {
     padding: Spacing.xs,
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 16,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

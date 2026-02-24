@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -15,6 +15,7 @@ import { PromoBanner } from '@/components/home/PromoBanner';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useBanners } from '@/hooks/use-banners';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useCategories } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
@@ -30,80 +31,127 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { categories, error: categoriesError, refetch: refetchCategories } = useCategories();
-  const { products, loading: productsLoading, error: productsError, refetch: refetchProducts } =
-    useProducts({
-      categoryId: selectedCategoryId,
-      searchQuery,
-    });
+  // 🔥 Banner hook
+  const {
+    banners,
+    refetch: refetchBanners,
+  } = useBanners();
 
+  // 🔥 Categories hook
+  const {
+    categories,
+    error: categoriesError,
+    refetch: refetchCategories,
+  } = useCategories();
+
+  // 🔥 Products hook
+  const {
+    products,
+    loading: productsLoading,
+    error: productsError,
+    refetch: refetchProducts,
+  } = useProducts({
+    categoryId: selectedCategoryId,
+    searchQuery,
+  });
+
+  // 🔥 Pull to refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refetchCategories(), refetchProducts()]);
+      await Promise.all([
+        refetchCategories(),
+        refetchProducts(),
+        refetchBanners(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchCategories, refetchProducts]);
+  }, [refetchCategories, refetchProducts, refetchBanners]);
 
-  const handleSearchSubmit = useCallback(() => {
-    setSearchQuery(searchInputValue.trim());
-  }, [searchInputValue]);
+  // 🔥 Search submit from autocomplete
+  const handleSearchSubmit = useCallback((text: string) => {
+    setSearchInputValue(text);
+    setSearchQuery(text.trim());
+  }, []);
 
+  // 🔥 Category select
   const handleSelectCategory = useCallback((categoryId: number | null) => {
     setSelectedCategoryId(categoryId);
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: background }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: background }]}
+      edges={['top']}
+    >
       <Header />
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+
+      <FlatList
+        data={products}
+        keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={primary} />
-        }
-      >
-        <SearchBar
-          value={searchInputValue}
-          onChangeText={setSearchInputValue}
-          onSubmit={handleSearchSubmit}
-        />
-        <PromoBanner />
-        {categoriesError ? (
-          <ThemedText style={[styles.error, { color: text }]}>
-            {categoriesError.message}
-          </ThemedText>
-        ) : (
-          <CategoryMenu
-            categories={categories}
-            selectedId={selectedCategoryId}
-            onSelectCategory={handleSelectCategory}
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={primary}
           />
+        }
+        ListHeaderComponent={
+          <>
+            {/* 🔍 Search */}
+            <SearchBar
+              value={searchInputValue}
+              onChangeText={setSearchInputValue}
+              onSubmit={handleSearchSubmit}
+            />
+
+            {/* 🎯 Promo Banner */}
+            <PromoBanner banners={banners} />
+
+            {/* 📂 Categories */}
+            {categoriesError ? (
+              <ThemedText style={[styles.error, { color: text }]}>
+                {categoriesError.message}
+              </ThemedText>
+            ) : (
+              <CategoryMenu
+                categories={categories}
+                selectedId={selectedCategoryId}
+                onSelectCategory={handleSelectCategory}
+              />
+            )}
+
+            {/* 🔥 Section Title */}
+            <View style={styles.section}>
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+                {t('home.popularNearYou')}
+              </ThemedText>
+            </View>
+          </>
+        }
+        renderItem={({ item }) => (
+          <ProductCard product={item} onPress={() => {}} />
         )}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            {t('home.popularNearYou')}
-          </ThemedText>
-          {productsError ? (
+        ListEmptyComponent={
+          productsLoading ? (
+            <ActivityIndicator size="large" style={styles.loader} />
+          ) : productsError ? (
             <ThemedText style={[styles.error, { color: text }]}>
               {productsError.message}
             </ThemedText>
-          ) : productsLoading ? (
-            <ActivityIndicator size="large" style={styles.loader} />
-          ) : products.length === 0 ? (
+          ) : (
             <ThemedText style={[styles.empty, { color: text }]}>
               {t('products.empty')}
             </ThemedText>
-          ) : (
-            products.map((product) => (
-              <ProductCard key={product.id} product={product} onPress={() => {}} />
-            ))
-          )}
-        </View>
-      </ScrollView>
+          )
+        }
+        contentContainerStyle={{
+          paddingBottom: Spacing.xxxl,
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -111,12 +159,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: Spacing.xxxl,
   },
   section: {
     paddingTop: Spacing.xs,

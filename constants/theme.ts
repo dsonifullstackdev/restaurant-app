@@ -22,6 +22,7 @@ export const Colors = {
     primaryDark: '#C1121F',
     surface: '#F5F5F5',
     border: '#E5E5E5',
+    secondary: '#dab7ba'
   },
   dark: {
     text: '#ECEDEE',
@@ -34,6 +35,7 @@ export const Colors = {
     primaryDark: '#E63946',
     surface: '#25262B',
     border: '#373A40',
+    secondary: '#dab7ba'
   },
 };
 
