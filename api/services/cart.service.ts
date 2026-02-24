@@ -1,23 +1,22 @@
-import { apiClient, setStoreNonce } from '@/api/client';
+import { apiClient, setCartToken } from '@/api/client';
 import { Endpoints } from '@/api/endpoints';
 
 /**
- * Initialize cart session
- * MUST be called once when app starts
+ * Initialize cart session and save Cart-Token.
  */
 export const initializeCart = async () => {
   try {
-    const response = await apiClient.get(Endpoints.ADD_TO_CART);
+    const response = await apiClient.get(Endpoints.CART);
 
-    const nonce =
-      response.headers['x-wc-store-api-nonce'] ||
-      response.headers['X-WC-Store-API-Nonce'];
+    const token =
+      response.headers['cart-token'] ||
+      response.headers['Cart-Token'];
 
-    if (nonce) {
-      setStoreNonce(nonce);
-      console.log('Store API Nonce stored:', nonce);
+    if (token) {
+      setCartToken(token as string);
+      console.log('Cart Token:', token);
     } else {
-      console.log('Nonce not found in headers');
+      console.warn('Cart-Token header not found');
     }
 
     return response.data;
@@ -28,11 +27,11 @@ export const initializeCart = async () => {
 };
 
 /**
- * Get Cart
+ * Get current cart state
  */
 export const getCart = async () => {
   try {
-    const response = await apiClient.get(Endpoints.ADD_TO_CART);
+    const response = await apiClient.get(Endpoints.CART);
     return response.data;
   } catch (error) {
     console.log('Get cart error:', error);
@@ -41,47 +40,37 @@ export const getCart = async () => {
 };
 
 /**
- * Add Item to Cart
+ * Add item with Cart Token
  */
 export const addToCart = async (
   productId: number,
-  quantity: number = 1
+  quantity = 1
 ) => {
   try {
     const response = await apiClient.post(
       Endpoints.ADD_TO_CART,
-      {
-        id: productId,
-        quantity,
-      }
+      { id: productId, quantity }
     );
 
     return response.data;
-  } catch (error: any) {
-    console.log(
-      'Add to cart error:',
-      error.response?.data || error.message
-    );
+  } catch (error) {
+    console.log('Add to cart error:', error);
     throw error;
   }
 };
 
 /**
- * Update Cart Item Quantity
+ * Update item
  */
 export const updateCartItem = async (
-  cartItemKey: string,
+  key: string,
   quantity: number
 ) => {
   try {
     const response = await apiClient.post(
       Endpoints.UPDATE_ITEM,
-      {
-        key: cartItemKey,
-        quantity,
-      }
+      { key, quantity }
     );
-
     return response.data;
   } catch (error) {
     console.log('Update cart error:', error);
@@ -90,17 +79,14 @@ export const updateCartItem = async (
 };
 
 /**
- * Remove Item from Cart
+ * Remove item
  */
-export const removeCartItem = async (cartItemKey: string) => {
+export const removeCartItem = async (key: string) => {
   try {
     const response = await apiClient.post(
       Endpoints.REMOVE_ITEM,
-      {
-        key: cartItemKey,
-      }
+      { key }
     );
-
     return response.data;
   } catch (error) {
     console.log('Remove cart error:', error);
