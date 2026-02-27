@@ -51,7 +51,7 @@ export default function CartScreen() {
   );
 
   const handlePlaceOrder = useCallback(() => {
-    router.push('/checkout');
+    router.push('/Checkout');
   }, [router]);
 
   // ── Empty state ────────────────────────────────────────────────────

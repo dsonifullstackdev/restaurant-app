@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
@@ -7,24 +7,43 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { initializeCart } from '@/api/services/cart.service';
 import { FloatingCartBar } from '@/components/Floatingcartbar';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { usePathname } from 'expo-router';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+// ── Auth gate — redirects to login if not authenticated ─────────────
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) return; // wait for stored token check
+
+    const inAuthGroup = segments[0] === 'login';
+
+    if (!isLoggedIn && !inAuthGroup) {
+      router.replace('/login');
+    } else if (isLoggedIn && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [isLoggedIn, isLoading, segments]);
+
+  return <>{children}</>;
+}
+
+// ── Inner layout — needs auth context ───────────────────────────────
+function AppLayout() {
   const colorScheme = useColorScheme();
-  const pathname = usePathname(); // current route
-  const showFloatingCart = pathname === '/';
 
   useEffect(() => {
     const init = async () => {
       try {
         await initializeCart();
-        console.log('Cart initialized');
       } catch (error) {
         console.log('Cart initialization failed:', error);
       }
@@ -33,27 +52,41 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <CartProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <CartProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AuthGate>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="cart" />
+            <Stack.Screen name="checkout" />
+            <Stack.Screen name="order-success" />
             <Stack.Screen
               name="modal"
               options={{
                 presentation: 'modal',
-                title: 'Modal',
                 headerShown: true,
+                title: 'Modal',
               }}
             />
           </Stack>
 
-          {/* Floating cart bar — shows above all screens when cart has items */}
-          {showFloatingCart && <FloatingCartBar />}
+          <FloatingCartBar />
+        </AuthGate>
 
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </CartProvider>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </CartProvider>
+  );
+}
+
+// ── Root — AuthProvider wraps everything ────────────────────────────
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppLayout />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

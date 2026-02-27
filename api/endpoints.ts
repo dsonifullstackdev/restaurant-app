@@ -10,4 +10,5 @@ export const Endpoints = {
   ADD_TO_CART: '/cart/add-item',
   UPDATE_ITEM: '/cart/update-item',
   REMOVE_ITEM: '/cart/remove-item',
+  CHECKOUT: '/checkout',
 } as const;

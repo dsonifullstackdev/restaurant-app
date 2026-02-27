@@ -37,6 +37,7 @@
     "empty": "No products found."
   },
   "cart": {
-    "view_cart": "View cart"
+    "view_cart": "View cart",
+    "place_order": "Place Order"
   }
 }
