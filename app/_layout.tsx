@@ -15,14 +15,15 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-// ── Auth gate — redirects to login if not authenticated ─────────────
+// ── Auth gate — redirects to login + initializes cart after login ────
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
+  // ── Navigation guard ─────────────────────────────────────────────
   useEffect(() => {
-    if (isLoading) return; // wait for stored token check
+    if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'login';
 
@@ -33,23 +34,32 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [isLoggedIn, isLoading, segments]);
 
-  return <>{children}</>;
-}
-
-// ── Inner layout — needs auth context ───────────────────────────────
-function AppLayout() {
-  const colorScheme = useColorScheme();
-
+  // ── Cart init — only after user is logged in ─────────────────────
+  // NOT called on login screen, NOT called before auth check completes.
+  // Runs when: isLoading=false AND isLoggedIn=true
+  // Re-runs automatically if user logs out and back in.
   useEffect(() => {
+    if (isLoading) return;   // still checking stored token — wait
+    if (!isLoggedIn) return; // on login screen — skip
+
     const init = async () => {
       try {
         await initializeCart();
+        console.log('Cart initialized for logged-in user');
       } catch (error) {
         console.log('Cart initialization failed:', error);
       }
     };
+
     init();
-  }, []);
+  }, [isLoggedIn, isLoading]);
+
+  return <>{children}</>;
+}
+
+// ── Inner layout ──────────────────────────────────────────────────────
+function AppLayout() {
+  const colorScheme = useColorScheme();
 
   return (
     <CartProvider>
@@ -80,7 +90,7 @@ function AppLayout() {
   );
 }
 
-// ── Root — AuthProvider wraps everything ────────────────────────────
+// ── Root — AuthProvider wraps everything ─────────────────────────────
 export default function RootLayout() {
   return (
     <SafeAreaProvider>

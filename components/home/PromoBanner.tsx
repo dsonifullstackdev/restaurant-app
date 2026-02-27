@@ -10,6 +10,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type PromoBannerProps = {
   banners: WcBanner[];
+  bannerHeight?: number; // ✅ fixed type
 };
 
 function getImageUrl(image: WcBanner['image']): string | null {
@@ -30,7 +31,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-export function PromoBanner({ banners }: PromoBannerProps) {
+export function PromoBanner({ banners, bannerHeight = 200 }: PromoBannerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -46,7 +47,7 @@ export function PromoBanner({ banners }: PromoBannerProps) {
     []
   );
 
-  // Auto rotate every 3 seconds (1s is too fast to read)
+  // Auto rotate every 3 seconds
   useEffect(() => {
     if (!banners?.length) return;
 
@@ -82,17 +83,21 @@ export function PromoBanner({ banners }: PromoBannerProps) {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleScroll}
         onScrollBeginDrag={() => {
-          // Pause auto rotation when user drags
           if (timerRef.current) clearInterval(timerRef.current);
         }}
         scrollEventThrottle={16}
       >
         {banners.map((banner) => {
           const imageUrl = getImageUrl(banner.image);
-          const description = banner.description ? stripHtml(banner.description) : null;
+          const description = banner.description
+            ? stripHtml(banner.description)
+            : null;
 
           return (
-            <View key={banner.id} style={styles.banner}>
+            <View
+              key={banner.id}
+              style={[styles.banner, { height: bannerHeight }]} // ✅ dynamic height applied here
+            >
               {imageUrl ? (
                 <Image
                   source={{ uri: imageUrl }}
@@ -133,7 +138,9 @@ export function PromoBanner({ banners }: PromoBannerProps) {
               key={index}
               style={[
                 styles.dot,
-                index === activeIndex ? styles.dotActive : styles.dotInactive,
+                index === activeIndex
+                  ? styles.dotActive
+                  : styles.dotInactive,
               ]}
             />
           ))}
@@ -149,7 +156,6 @@ const styles = StyleSheet.create({
   },
   banner: {
     width: SCREEN_WIDTH,
-    height: 180,
     overflow: 'hidden',
   },
   placeholder: {

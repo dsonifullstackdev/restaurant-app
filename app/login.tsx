@@ -1,28 +1,30 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import { showPhoneNumberHint } from '@shayrn/react-native-android-phone-number-hint';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { initDevice } from '@/api/services/device.service';
+import { PromoBanner } from '@/components/home/PromoBanner';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useBanners } from '@/hooks/use-banners';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { collectFingerprint } from '@/utils/fingerprint';
 import { stripCountryCode } from '@/utils/phone';
-import { showPhoneNumberHint } from '@shayrn/react-native-android-phone-number-hint';
 
-const { width: W, height: H } = Dimensions.get('window');
 
 type Tab = 'phone' | 'email';
 
@@ -34,6 +36,10 @@ export default function LoginScreen() {
   const text = useThemeColor({}, 'text');
   const icon = useThemeColor({}, 'icon');
 
+  // ── Banners ──────────────────────────────────────────────────────
+  const { banners } = useBanners({ banner_pos: 'login' });
+
+  // ── Form state ───────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -46,14 +52,69 @@ export default function LoginScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      handleAutoDetect();
-    }
-  }, []); // runs once on screen load
+  // ── Phone ref — always has latest value for fingerprint ──────────
+  const phoneRef = useRef('');
+  const handleSetPhone = (val: string) => {
+    phoneRef.current = val;
+    setPhone(val);
+  };
 
   const tabAnim = useRef(new Animated.Value(0)).current;
 
+  // ── On mount: auto-detect phone + send init fingerprint ──────────
+  useEffect(() => {
+    const init = async () => {
+      let detectedPhone = '';
+      if (Platform.OS === 'android') {
+        try {
+          const raw = await showPhoneNumberHint();
+          if (raw) {
+            detectedPhone = stripCountryCode(raw);
+            handleSetPhone(detectedPhone);
+          }
+        } catch {
+          // User dismissed — silent fail
+        }
+      }
+      sendFingerprint('init_request', detectedPhone || undefined);
+    };
+    init();
+  }, []);
+
+  // ── Send fingerprint to server ────────────────────────────────────
+  const sendFingerprint = useCallback(async (
+    actionKey: 'init_request' | 'login_complete' | 'register_complete',
+    phoneOverride?: string,
+    emailOverride?: string,
+  ) => {
+    try {
+      const fingerprint = await collectFingerprint({
+        action_key: actionKey,
+        phone: phoneOverride,
+        email: emailOverride,
+      });
+      const response = await initDevice(fingerprint);
+      console.log(`[Device ${actionKey}]`, {
+        record_id: response.record_id,
+        match_score: response.match_score,
+        offersEligible: response.offersEligible,
+        matchedSignals: response.matchedSignals,
+      });
+    } catch (err) {
+      console.log('[Device init non-blocking error]:', err);
+    }
+  }, []);
+
+  // ── Manual SIM button ─────────────────────────────────────────────
+  const handleAutoDetect = useCallback(async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      const raw = await showPhoneNumberHint();
+      if (raw) handleSetPhone(stripCountryCode(raw));
+    } catch {}
+  }, []);
+
+  // ── Tab switch ────────────────────────────────────────────────────
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setError(null);
@@ -64,21 +125,8 @@ export default function LoginScreen() {
       friction: 12,
     }).start();
   };
-  const handleAutoDetect = useCallback(async () => {
-    if (Platform.OS !== 'android') return;
-    try {
-      const phoneNumber = await showPhoneNumberHint();
-      //const phoneNumber = '+93 9176543210'; // Simulated phone number for testing
-      if (phoneNumber) {
-         const final = stripCountryCode(phoneNumber);
-        setPhone(final);
-      }
 
-    } catch (err) {
-      console.log('LOGINHINT-ERROR:', err);
-    }
-  }, []);
-
+  // ── Submit ────────────────────────────────────────────────────────
   const handleContinue = useCallback(async () => {
     setError(null);
 
@@ -87,29 +135,22 @@ export default function LoginScreen() {
         setError('Enter a valid 10-digit phone number');
         return;
       }
-      // TODO: Integrate OTP service (e.g. Firebase, MSG91)
       setError('Phone OTP login coming soon. Please use email.');
       return;
     }
-    // Email flow
+
     if (!email.trim()) { setError('Email is required'); return; }
     if (!password.trim()) { setError('Password is required'); return; }
-
-    if (isRegister) {
-      if (!firstName.trim()) { setError('First name is required'); return; }
-    }
+    if (isRegister && !firstName.trim()) { setError('First name is required'); return; }
 
     setLoading(true);
     try {
       if (isRegister) {
-        await register({
-          email,
-          password,
-          firstName,
-          lastName,
-        });
+        await register({ email, password, firstName, lastName });
+        sendFingerprint('register_complete', phoneRef.current || undefined, email);
       } else {
         await login({ email, password });
+        sendFingerprint('login_complete', phoneRef.current || undefined, email);
       }
       router.replace('/(tabs)');
     } catch (err: any) {
@@ -120,7 +161,7 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, phone, email, password, firstName, lastName, isRegister, login, register, router]);
+  }, [activeTab, phone, email, password, firstName, lastName, isRegister, login, register, router, sendFingerprint]);
 
   const tabIndicatorLeft = tabAnim.interpolate({
     inputRange: [0, 1],
@@ -132,28 +173,13 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* ── Hero Image Section ── */}
+      {/* ── Hero Banner — reuses same PromoBanner as home screen ── */}
       <View style={styles.hero}>
-        <View style={styles.heroBg} />
-        <View style={styles.heroContent}>
-          <ThemedText style={styles.heroTagline}>Order food you love</ThemedText>
-          <ThemedText style={styles.heroTitle}>Fast Delivery{'\n'}To Your Door</ThemedText>
-          {/* Dots */}
-          <View style={styles.heroDots}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <View
-                key={i}
-                style={[styles.heroDot, i === 0 && styles.heroDotActive]}
-              />
-            ))}
-          </View>
-        </View>
+        <PromoBanner banners={banners} bannerHeight={320} />
       </View>
-      {/* ── Login Sheet ── */}
-      <KeyboardAvoidingView
-        style={[styles.sheet, { backgroundColor: surface }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+
+      {/* ── Bottom Sheet ── */}
+      <View style={[styles.sheet, { backgroundColor: surface }]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -163,35 +189,14 @@ export default function LoginScreen() {
 
           {/* ── Tab switcher ── */}
           <View style={styles.tabBar}>
-            <Animated.View
-              style={[
-                styles.tabIndicator,
-                { left: tabIndicatorLeft },
-              ]}
-            />
-            <TouchableOpacity
-              style={styles.tab}
-              onPress={() => switchTab('phone')}
-            >
-              <ThemedText
-                style={[
-                  styles.tabText,
-                  activeTab === 'phone' && styles.tabTextActive,
-                ]}
-              >
+            <Animated.View style={[styles.tabIndicator, { left: tabIndicatorLeft }]} />
+            <TouchableOpacity style={styles.tab} onPress={() => switchTab('phone')}>
+              <ThemedText style={[styles.tabText, activeTab === 'phone' && styles.tabTextActive]}>
                 📱 Phone
               </ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.tab}
-              onPress={() => switchTab('email')}
-            >
-              <ThemedText
-                style={[
-                  styles.tabText,
-                  activeTab === 'email' && styles.tabTextActive,
-                ]}
-              >
+            <TouchableOpacity style={styles.tab} onPress={() => switchTab('email')}>
+              <ThemedText style={[styles.tabText, activeTab === 'email' && styles.tabTextActive]}>
                 ✉️ Email
               </ThemedText>
             </TouchableOpacity>
@@ -211,11 +216,10 @@ export default function LoginScreen() {
                   placeholder="Enter Phone Number"
                   placeholderTextColor="rgba(150,150,150,0.8)"
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={handleSetPhone}
                   keyboardType="phone-pad"
                   maxLength={10}
                 />
-                {/* ✅ Auto detect button HERE inside the tab */}
                 {Platform.OS === 'android' && (
                   <TouchableOpacity
                     style={[styles.autoDetectBtn, { borderColor: 'rgba(0,0,0,0.15)' }]}
@@ -279,8 +283,6 @@ export default function LoginScreen() {
                   />
                 </TouchableOpacity>
               </View>
-
-              {/* Toggle login/register */}
               <TouchableOpacity onPress={() => { setIsRegister((r) => !r); setError(null); }}>
                 <ThemedText style={styles.toggleAuth}>
                   {isRegister
@@ -297,9 +299,7 @@ export default function LoginScreen() {
             onPress={() => setRememberMe((r) => !r)}
           >
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && (
-                <MaterialIcons name="check" size={14} color="#fff" />
-              )}
+              {rememberMe && <MaterialIcons name="check" size={14} color="#fff" />}
             </View>
             <ThemedText style={styles.rememberText}>
               Remember my login for faster sign-in
@@ -337,17 +337,14 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* ── Social login ── */}
+          {/* ── Social ── */}
           <View style={styles.socialRow}>
-            {/* Google */}
             <TouchableOpacity
               style={[styles.socialBtn, { borderColor: 'rgba(0,0,0,0.12)' }]}
               onPress={() => setError('Google login coming soon')}
             >
               <ThemedText style={styles.socialIcon}>G</ThemedText>
             </TouchableOpacity>
-
-            {/* Email (if on phone tab, show email shortcut) */}
             {activeTab === 'phone' && (
               <TouchableOpacity
                 style={[styles.socialBtn, { borderColor: 'rgba(0,0,0,0.12)' }]}
@@ -368,70 +365,27 @@ export default function LoginScreen() {
             <ThemedText style={styles.termsLink}>Content Policy</ThemedText>
           </ThemedText>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-  },
-  // Hero
+  container: { flex: 1, backgroundColor: '#1a1a1a' },
+
+  // Hero wraps PromoBanner — fixed height same as home screen
   hero: {
-    height: H * 0.45,
-    position: 'relative',
+    marginTop: 20,
     overflow: 'hidden',
-  },
-  heroBg: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: '#1a1a1a',
   },
-  heroContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 60,
-    gap: Spacing.sm,
-  },
-  heroTagline: {
-    fontSize: 14,
-    color: '#E8445A',
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 42,
-  },
-  heroDots: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: Spacing.lg,
-  },
-  heroDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  heroDotActive: {
-    width: 18,
-    backgroundColor: '#fff',
-  },
-  // Sheet
+
   sheet: {
     flex: 1,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
-    marginTop: -28,
   },
   sheetTitle: {
     fontSize: 20,
@@ -439,6 +393,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
+
   // Tabs
   tabBar: {
     flexDirection: 'row',
@@ -455,42 +410,22 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#fff',
     borderRadius: BorderRadius.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
   },
-  tab: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.5,
-  },
-  tabTextActive: {
-    opacity: 1,
-    fontWeight: '700',
-  },
+  tab: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  tabText: { fontSize: 14, fontWeight: '500', opacity: 0.5 },
+  tabTextActive: { opacity: 1, fontWeight: '700' },
+
   // Inputs
-  inputGroup: {
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
+  inputGroup: { gap: Spacing.md, marginBottom: Spacing.md },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   countryCode: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     gap: 4,
     minWidth: 90,
   },
@@ -504,6 +439,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     fontSize: 15,
   },
+  autoDetectBtn: {
+    borderWidth: 1.5,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   input: {
     borderWidth: 1.5,
     borderRadius: BorderRadius.lg,
@@ -511,9 +453,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     fontSize: 15,
   },
-  passwordRow: {
-    position: 'relative',
-  },
+  passwordRow: { position: 'relative' },
   passwordInput: {
     borderWidth: 1.5,
     borderRadius: BorderRadius.lg,
@@ -529,12 +469,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
   },
-  toggleAuth: {
-    fontSize: 13,
-    color: '#E8445A',
-    fontWeight: '600',
-    textAlign: 'right',
-  },
+  toggleAuth: { fontSize: 13, color: '#E8445A', fontWeight: '600', textAlign: 'right' },
+
   // Remember me
   rememberRow: {
     flexDirection: 'row',
@@ -552,15 +488,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxChecked: {
-    backgroundColor: '#E8445A',
-    borderColor: '#E8445A',
-  },
-  rememberText: {
-    fontSize: 13,
-    opacity: 0.65,
-    flex: 1,
-  },
+  checkboxChecked: { backgroundColor: '#E8445A', borderColor: '#E8445A' },
+  rememberText: { fontSize: 13, opacity: 0.65, flex: 1 },
+
   // Error
   errorBox: {
     flexDirection: 'row',
@@ -571,11 +501,8 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
   },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#E8445A',
-  },
+  errorText: { flex: 1, fontSize: 13, color: '#E8445A' },
+
   // Continue button
   continueBtn: {
     backgroundColor: '#E8445A',
@@ -588,11 +515,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  continueBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  continueBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
   // Divider
   dividerRow: {
     flexDirection: 'row',
@@ -600,15 +524,9 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginVertical: Spacing.lg,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-  },
-  dividerText: {
-    fontSize: 13,
-    opacity: 0.4,
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  dividerText: { fontSize: 13, opacity: 0.4 },
+
   // Social
   socialRow: {
     flexDirection: 'row',
@@ -624,27 +542,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  socialIcon: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#4285F4',
-  },
+  socialIcon: { fontSize: 20, fontWeight: '900', color: '#4285F4' },
+
   // Terms
-  terms: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.5,
-    lineHeight: 20,
-  },
-  termsLink: {
-    opacity: 1,
-    fontWeight: '600',
-  },
-  autoDetectBtn: {
-    borderWidth: 1.5,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  terms: { fontSize: 12, textAlign: 'center', opacity: 0.5, lineHeight: 20 },
+  termsLink: { opacity: 1, fontWeight: '600' },
 });

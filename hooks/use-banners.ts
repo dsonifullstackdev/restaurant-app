@@ -7,7 +7,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchBanners } from '@/api/services/banner.service';
 import type { WcBanner } from '@/types/api';
 
-export function useBanners() {
+type UseBannersParams = {
+  per_page?: number;
+  banner_pos?: string;
+};
+
+export function useBanners(params?: UseBannersParams) {
   const [banners, setBanners] = useState<WcBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -16,8 +21,11 @@ export function useBanners() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchBanners({ per_page: 10 });
-      console.log("BANNER-RESP-DAT", data)
+      const data = await fetchBanners({
+        per_page: params?.per_page ?? 10,
+        banner_pos: params?.banner_pos,
+      });
+      console.log('BANNER-RESP-DAT', data);
       setBanners(data);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
@@ -25,7 +33,7 @@ export function useBanners() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [params?.per_page, params?.banner_pos]);
 
   useEffect(() => {
     load();

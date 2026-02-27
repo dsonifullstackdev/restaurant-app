@@ -11,4 +11,5 @@ export const Endpoints = {
   UPDATE_ITEM: '/cart/update-item',
   REMOVE_ITEM: '/cart/remove-item',
   CHECKOUT: '/checkout',
+  INIT_DEVICE: '/device',
 } as const;
