@@ -31,7 +31,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-export function PromoBanner({ banners, bannerHeight = 200 }: PromoBannerProps) {
+export function PromoBanner({ banners, bannerHeight = 280 }: PromoBannerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);

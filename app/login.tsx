@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { initDevice } from '@/api/services/device.service';
+import { getStoredDeviceData, initDevice } from '@/api/services/device.service';
+import { sendOtp } from '@/api/services/otp.service';
 import { PromoBanner } from '@/components/home/PromoBanner';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
@@ -24,7 +25,6 @@ import { useBanners } from '@/hooks/use-banners';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { collectFingerprint } from '@/utils/fingerprint';
 import { stripCountryCode } from '@/utils/phone';
-
 
 type Tab = 'phone' | 'email';
 
@@ -81,7 +81,7 @@ export default function LoginScreen() {
     init();
   }, []);
 
-  // ── Send fingerprint to server ────────────────────────────────────
+  // ── Send fingerprint ─────────────────────────────────────────────
   const sendFingerprint = useCallback(async (
     actionKey: 'init_request' | 'login_complete' | 'register_complete',
     phoneOverride?: string,
@@ -105,7 +105,7 @@ export default function LoginScreen() {
     }
   }, []);
 
-  // ── Manual SIM button ─────────────────────────────────────────────
+  // ── Manual SIM button ────────────────────────────────────────────
   const handleAutoDetect = useCallback(async () => {
     if (Platform.OS !== 'android') return;
     try {
@@ -114,7 +114,7 @@ export default function LoginScreen() {
     } catch {}
   }, []);
 
-  // ── Tab switch ────────────────────────────────────────────────────
+  // ── Tab switch ───────────────────────────────────────────────────
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setError(null);
@@ -126,19 +126,45 @@ export default function LoginScreen() {
     }).start();
   };
 
-  // ── Submit ────────────────────────────────────────────────────────
+  // ── Continue ─────────────────────────────────────────────────────
   const handleContinue = useCallback(async () => {
     setError(null);
 
+    // ── Phone flow → send OTP ────────────────────────────────────
     if (activeTab === 'phone') {
       if (!phone.trim() || phone.length < 10) {
         setError('Enter a valid 10-digit phone number');
         return;
       }
-      setError('Phone OTP login coming soon. Please use email.');
+
+      setLoading(true);
+      try {
+        // Get stored device data for spam check
+        const { recordId } = await getStoredDeviceData();
+
+        // Collect screen resolution + android_id fresh
+        const fingerprint = await collectFingerprint({ action_key: 'init_request' });
+
+        await sendOtp({
+          mobile: phone.trim(),
+          record_id: recordId ?? '',
+          screen_resolution: fingerprint.screenResolution,
+          android_id: fingerprint.androidId,
+        });
+        console.log('[OTP sent] for phone:', phone.trim());
+        // Navigate to OTP screen passing mobile number
+        router.push(`/otp?mobile=${encodeURIComponent(phone.trim())}`);
+
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? 'Failed to send OTP. Try again.';
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
+    // ── Email flow ───────────────────────────────────────────────
     if (!email.trim()) { setError('Email is required'); return; }
     if (!password.trim()) { setError('Password is required'); return; }
     if (isRegister && !firstName.trim()) { setError('First name is required'); return; }
@@ -173,7 +199,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* ── Hero Banner — reuses same PromoBanner as home screen ── */}
+      {/* ── Hero Banner ── */}
       <View style={styles.hero}>
         <PromoBanner banners={banners} bannerHeight={320} />
       </View>
@@ -372,14 +398,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
-
-  // Hero wraps PromoBanner — fixed height same as home screen
-  hero: {
-    marginTop: 20,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-
+  hero: { overflow: 'hidden', backgroundColor: '#1a1a1a' },
   sheet: {
     flex: 1,
     borderTopLeftRadius: 28,
@@ -387,14 +406,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
   },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-
-  // Tabs
+  sheetTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: Spacing.lg },
   tabBar: {
     flexDirection: 'row',
     height: 44,
@@ -415,8 +427,6 @@ const styles = StyleSheet.create({
   tab: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   tabText: { fontSize: 14, fontWeight: '500', opacity: 0.5 },
   tabTextActive: { opacity: 1, fontWeight: '700' },
-
-  // Inputs
   inputGroup: { gap: Spacing.md, marginBottom: Spacing.md },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   countryCode: {
@@ -462,16 +472,8 @@ const styles = StyleSheet.create({
     paddingRight: 50,
     fontSize: 15,
   },
-  eyeBtn: {
-    position: 'absolute',
-    right: Spacing.md,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
+  eyeBtn: { position: 'absolute', right: Spacing.md, top: 0, bottom: 0, justifyContent: 'center' },
   toggleAuth: { fontSize: 13, color: '#E8445A', fontWeight: '600', textAlign: 'right' },
-
-  // Remember me
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -490,8 +492,6 @@ const styles = StyleSheet.create({
   },
   checkboxChecked: { backgroundColor: '#E8445A', borderColor: '#E8445A' },
   rememberText: { fontSize: 13, opacity: 0.65, flex: 1 },
-
-  // Error
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,8 +502,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   errorText: { flex: 1, fontSize: 13, color: '#E8445A' },
-
-  // Continue button
   continueBtn: {
     backgroundColor: '#E8445A',
     borderRadius: BorderRadius.xl,
@@ -516,8 +514,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   continueBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  // Divider
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -526,25 +522,9 @@ const styles = StyleSheet.create({
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
   dividerText: { fontSize: 13, opacity: 0.4 },
-
-  // Social
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  socialBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.lg },
+  socialBtn: { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
   socialIcon: { fontSize: 20, fontWeight: '900', color: '#4285F4' },
-
-  // Terms
   terms: { fontSize: 12, textAlign: 'center', opacity: 0.5, lineHeight: 20 },
   termsLink: { opacity: 1, fontWeight: '600' },
 });

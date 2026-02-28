@@ -12,7 +12,6 @@ import type { AuthResponse, AuthUser, LoginWithEmailPayload, RegisterPayload } f
 const AUTH_TOKEN_KEY = '@auth_token';
 const AUTH_USER_KEY = '@auth_user';
 
-// WordPress JWT Auth endpoint (separate from WC Store API)
 const wpClient = axios.create({
   baseURL: AppConfig.API_BASE_URL,
   timeout: 20000,
@@ -57,18 +56,15 @@ export async function loginWithEmail(
 export async function registerUser(
   payload: RegisterPayload
 ): Promise<AuthUser> {
-  const { data } = await wpClient.post(
-    '/wp-json/wc/v3/customers',
-    {
-      email: payload.email,
-      password: payload.password,
-      first_name: payload.firstName,
-      last_name: payload.lastName,
-      username: payload.email,
-    }
-  );
+  await wpClient.post('/wp-json/wc/v3/customers', {
+    email: payload.email,
+    password: payload.password,
+    first_name: payload.firstName,
+    last_name: payload.lastName,
+    username: payload.email,
+  });
 
-  // After register, auto-login
+  // Auto-login after register
   return loginWithEmail({
     email: payload.email,
     password: payload.password,
@@ -121,8 +117,9 @@ export async function clearAuth(): Promise<void> {
 
 /**
  * Persist auth user and token to AsyncStorage.
+ * Exported so AuthContext.loginWithToken can call it directly.
  */
-async function persistAuth(user: AuthUser): Promise<void> {
+export async function persistAuth(user: AuthUser): Promise<void> {
   await AsyncStorage.setItem(AUTH_TOKEN_KEY, user.token);
   await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 }

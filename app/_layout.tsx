@@ -25,7 +25,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'login';
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'otp';
 
     if (!isLoggedIn && !inAuthGroup) {
       router.replace('/login');
@@ -71,6 +71,7 @@ function AppLayout() {
             <Stack.Screen name="cart" />
             <Stack.Screen name="checkout" />
             <Stack.Screen name="order-success" />
+            <Stack.Screen name="otp" options={{ headerShown: false }} />
             <Stack.Screen
               name="modal"
               options={{
