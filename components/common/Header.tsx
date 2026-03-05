@@ -6,9 +6,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { AppConfig } from '@/config/app.config';
 import { Spacing } from '@/constants/theme';
+import { useCart } from '@/context/CartContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { t } from '@/i18n';
-import { useCartStore } from '@/store/cart.store';
 
 export function Header() {
   const primary = useThemeColor({}, 'primary');
@@ -16,29 +16,19 @@ export function Header() {
   const icon = useThemeColor({}, 'icon');
   const router = useRouter();
 
-  const cartCount = useCartStore((state) => state.cartCount);
+  const { totalItems } = useCart();
 
   return (
     <View style={styles.container}>
       {/* App Name */}
-      <ThemedText
-        style={[styles.logo, { color: primary }]}
-        type="defaultSemiBold"
-      >
+      <ThemedText style={[styles.logo, { color: primary }]} type="defaultSemiBold">
         {AppConfig.APP_NAME}
       </ThemedText>
 
       {/* Location */}
-      <Pressable
-        style={styles.location}
-        onPress={() => {}}
-        accessibilityLabel={t('home.deliveryAddress')}
-      >
+      <Pressable style={styles.location} onPress={() => {}} accessibilityLabel={t('home.deliveryAddress')}>
         <MaterialIcons name="location-on" size={18} color={icon} />
-        <ThemedText
-          style={[styles.locationText, { color: text }]}
-          numberOfLines={1}
-        >
+        <ThemedText style={[styles.locationText, { color: text }]} numberOfLines={1}>
           {t('home.deliveryAddress')}
         </ThemedText>
         <MaterialIcons name="keyboard-arrow-down" size={20} color={icon} />
@@ -47,35 +37,24 @@ export function Header() {
       {/* Right Icons */}
       <View style={styles.rightIcons}>
         {/* Notification */}
-        <Pressable
-          style={styles.iconButton}
-          onPress={() => {}}
-          accessibilityLabel="Notifications"
-        >
-          <MaterialIcons
-            name="notifications-none"
-            size={24}
-            color={icon}
-          />
+        <Pressable style={styles.iconButton} onPress={() => {}} accessibilityLabel="Notifications">
+          <MaterialIcons name="notifications-none" size={24} color={icon} />
         </Pressable>
 
-        {/* Cart Icon */}
+        {/* Cart Icon — disabled when empty */}
         <Pressable
           style={styles.iconButton}
-          onPress={() => router.push('/cart')}
+          onPress={() => { if (totalItems > 0) router.push('/cart'); }}
           accessibilityLabel="Cart"
         >
           <MaterialIcons
             name="shopping-cart"
             size={24}
-            color={icon}
+            color={totalItems > 0 ? icon : `${icon}55`} // dimmed when empty
           />
-
-          {cartCount > 0 && (
+          {totalItems > 0 && (
             <View style={styles.badge}>
-              <ThemedText style={styles.badgeText}>
-                {cartCount}
-              </ThemedText>
+              <ThemedText style={styles.badgeText}>{totalItems}</ThemedText>
             </View>
           )}
         </Pressable>
@@ -93,43 +72,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
   },
-  logo: {
-    fontSize: 20,
-  },
+  logo: { fontSize: 20 },
   location: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    minWidth: 0,
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    gap: Spacing.xs, minWidth: 0,
   },
-  locationText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  rightIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  iconButton: {
-    padding: Spacing.xs,
-  },
+  locationText: { fontSize: 14, flex: 1 },
+  rightIcons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  iconButton: { padding: Spacing.xs },
   badge: {
-    position: 'absolute',
-    top: -6,
-    right: -8,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    minWidth: 16,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: -6, right: -8,
+    backgroundColor: '#FF3B30', borderRadius: 10,
+    minWidth: 16, paddingHorizontal: 4, paddingVertical: 1,
+    alignItems: 'center', justifyContent: 'center',
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
 });

@@ -1,12 +1,13 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import {
+  BackHandler,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,6 +47,17 @@ export default function CartScreen() {
       await updateItem(key, item.quantity - 1); // 0 = remove, handled in context
     },
     [items, updateItem]
+  );
+
+  // ── Back → go to home, not trigger exit dialog ──────────────────
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/(tabs)');
+        return true;
+      });
+      return () => sub.remove();
+    }, [router])
   );
 
   const handlePlaceOrder = useCallback(() => {

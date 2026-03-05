@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -144,6 +145,15 @@ export default function ProfileScreen() {
     };
     load();
   }, []);
+
+  // ── Block back from going to login — go to tabs instead ─────────
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace('/(tabs)');
+      return true; // prevent default
+    });
+    return () => sub.remove();
+  }, [router]);
 
   // ── Switch diet ──────────────────────────────────────────────────
   const handleDietSwitch = useCallback(async (diet: WcProductCategory) => {

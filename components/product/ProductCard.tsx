@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
+import { useCart } from '@/context/CartContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { useCartStore } from '@/store/cart.store';
 import type { WcProduct } from '@/types/api';
 
 type ProductCardProps = {
@@ -33,10 +33,9 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
   const primary = useThemeColor({}, 'primary');
   const icon = useThemeColor({}, 'icon');
 
-  const addItem = useCartStore((state) => state.addItem);
+  const { addItem } = useCart();
 
   const imageUrl = getProductImageUrl(product);
-
   const salePrice = formatPrice(product.prices?.sale_price);
   const regularPrice = formatPrice(product.prices?.regular_price);
 
@@ -55,54 +54,32 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
   };
 
   return (
-    <Pressable
-      style={[styles.card, { backgroundColor: surface }]}
-      onPress={onPress}
-    >
+    <Pressable style={[styles.card, { backgroundColor: surface }]} onPress={onPress}>
       {/* LEFT CONTENT */}
       <View style={styles.body}>
-        <ThemedText
-          style={[styles.name, { color: text }]}
-          type="defaultSemiBold"
-          numberOfLines={1}
-        >
+        <ThemedText style={[styles.name, { color: text }]} type="defaultSemiBold" numberOfLines={1}>
           {product.name}
         </ThemedText>
 
-        {/* Price */}
         <View style={styles.priceRow}>
           {salePrice ? (
             <>
-              <ThemedText style={[styles.salePrice, { color: text }]}>
-                {salePrice}
-              </ThemedText>
-
+              <ThemedText style={[styles.salePrice, { color: text }]}>{salePrice}</ThemedText>
               {regularPrice && (
-                <ThemedText
-                  style={[styles.regularPrice, { color: icon }]}
-                >
-                  {regularPrice}
-                </ThemedText>
+                <ThemedText style={[styles.regularPrice, { color: icon }]}>{regularPrice}</ThemedText>
               )}
             </>
           ) : regularPrice ? (
-            <ThemedText style={[styles.salePrice, { color: text }]}>
-              {regularPrice}
-            </ThemedText>
+            <ThemedText style={[styles.salePrice, { color: text }]}>{regularPrice}</ThemedText>
           ) : null}
         </View>
 
         {discount ? (
-          <ThemedText style={styles.discount}>
-            {discount}% OFF
-          </ThemedText>
+          <ThemedText style={styles.discount}>{discount}% OFF</ThemedText>
         ) : null}
 
         {product.short_description ? (
-          <ThemedText
-            style={[styles.description, { color: icon }]}
-            numberOfLines={2}
-          >
+          <ThemedText style={[styles.description, { color: icon }]} numberOfLines={2}>
             {product.short_description.replace(/<[^>]+>/g, '')}
           </ThemedText>
         ) : null}
@@ -111,28 +88,14 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
       {/* IMAGE */}
       <View style={styles.imageContainer}>
         {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.image}
-            contentFit="cover"
-          />
+          <Image source={{ uri: imageUrl }} style={styles.image} contentFit="cover" />
         ) : (
-          <View
-            style={[
-              styles.imagePlaceholder,
-              { backgroundColor: icon },
-            ]}
-          />
+          <View style={[styles.imagePlaceholder, { backgroundColor: icon }]} />
         )}
 
         {/* ADD BUTTON */}
-        <Pressable
-          style={[styles.addButton, { borderColor: primary }]}
-          onPress={handleAddToCart}
-        >
-          <ThemedText style={[styles.addText, { color: primary }]}>
-            ADD
-          </ThemedText>
+        <Pressable style={[styles.addButton, { borderColor: primary }]} onPress={handleAddToCart}>
+          <ThemedText style={[styles.addText, { color: primary }]}>ADD</ThemedText>
         </Pressable>
       </View>
     </Pressable>
@@ -147,54 +110,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     gap: Spacing.lg,
   },
-  body: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  name: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  salePrice: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  regularPrice: {
-    fontSize: 13,
-    textDecorationLine: 'line-through',
-  },
-  discount: {
-    color: '#2979FF',
-    fontSize: 13,
-    fontWeight: '600',
-    marginVertical: 4,
-  },
-  description: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  imageContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: BorderRadius.lg,
-    overflow: 'visible',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    borderRadius: BorderRadius.lg,
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: BorderRadius.lg,
-    opacity: 0.2,
-  },
+  body: { flex: 1, justifyContent: 'center' },
+  name: { fontSize: 16, marginBottom: 4 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  salePrice: { fontSize: 15, fontWeight: '600' },
+  regularPrice: { fontSize: 13, textDecorationLine: 'line-through' },
+  discount: { color: '#2979FF', fontSize: 13, fontWeight: '600', marginVertical: 4 },
+  description: { fontSize: 13, marginTop: 4 },
+  imageContainer: { width: 110, height: 110, borderRadius: BorderRadius.lg, overflow: 'visible' },
+  image: { width: '100%', height: '100%', borderRadius: BorderRadius.lg },
+  imagePlaceholder: { width: '100%', height: '100%', borderRadius: BorderRadius.lg, opacity: 0.2 },
   addButton: {
     position: 'absolute',
     bottom: -10,
@@ -205,8 +130,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1.5,
   },
-  addText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  addText: { fontSize: 12, fontWeight: '600' },
 });
