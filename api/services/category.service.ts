@@ -10,6 +10,7 @@ export async function fetchCategories(params?: {
   per_page?: number;
   page?: number;
   hide_empty?: boolean;
+  action_key?: string;
 }): Promise<WcProductCategory[]> {
   const { data } = await apiClient.get<WcProductCategory[] | WcCategoriesResponse>(
     Endpoints.PRODUCTS_CATEGORIES,
@@ -18,6 +19,7 @@ export async function fetchCategories(params?: {
         per_page: params?.per_page ?? 100,
         page: params?.page ?? 1,
         hide_empty: params?.hide_empty ?? true,
+        ...(params?.action_key ? { action_key: params.action_key } : {}),
       },
     }
   );
@@ -25,5 +27,8 @@ export async function fetchCategories(params?: {
     return data;
   }
   const response = data as WcCategoriesResponse;
+
+  // console.log("CATE-RESP", response)
+
   return response.product_categories ?? [];
 }

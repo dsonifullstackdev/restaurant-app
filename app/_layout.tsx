@@ -12,52 +12,39 @@ import { CartProvider } from '@/context/CartContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  initialRouteName: 'login',
 };
 
-// ── Auth gate — redirects to login + initializes cart after login ────
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
-  // ── Navigation guard ─────────────────────────────────────────────
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) return; // still reading AsyncStorage — wait
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'otp';
+    const seg = segments[0] as string | undefined;
 
-    if (!isLoggedIn && !inAuthGroup) {
+    // Never redirect away from these screens — they handle their own navigation
+    const hands0ffScreens = ['onboarding', 'service-unavailable', 'otp', 'login'];
+    if (seg && hands0ffScreens.includes(seg)) return;
+
+    if (!isLoggedIn) {
+      // Not logged in and not on a public screen → go to login
       router.replace('/login');
-    } else if (isLoggedIn && inAuthGroup) {
-      router.replace('/(tabs)');
     }
-  }, [isLoggedIn, isLoading, segments]);
+    // Logged-in users are fine wherever they are
+  }, [isLoggedIn, isLoading, segments[0]]);
 
-  // ── Cart init — only after user is logged in ─────────────────────
-  // NOT called on login screen, NOT called before auth check completes.
-  // Runs when: isLoading=false AND isLoggedIn=true
-  // Re-runs automatically if user logs out and back in.
+  // Cart init after login
   useEffect(() => {
-    if (isLoading) return;   // still checking stored token — wait
-    if (!isLoggedIn) return; // on login screen — skip
-
-    const init = async () => {
-      try {
-        await initializeCart();
-        console.log('Cart initialized for logged-in user');
-      } catch (error) {
-        console.log('Cart initialization failed:', error);
-      }
-    };
-
-    init();
+    if (isLoading || !isLoggedIn) return;
+    initializeCart().catch(() => {});
   }, [isLoggedIn, isLoading]);
 
   return <>{children}</>;
 }
 
-// ── Inner layout ──────────────────────────────────────────────────────
 function AppLayout() {
   const colorScheme = useColorScheme();
 
@@ -71,27 +58,23 @@ function AppLayout() {
             <Stack.Screen name="cart" />
             <Stack.Screen name="checkout" />
             <Stack.Screen name="order-success" />
-            <Stack.Screen name="otp" options={{ headerShown: false }} />
+            <Stack.Screen name="otp" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="service-unavailable" />
             <Stack.Screen
               name="modal"
-              options={{
-                presentation: 'modal',
-                headerShown: true,
-                title: 'Modal',
-              }}
+              options={{ presentation: 'modal', headerShown: true, title: 'Modal' }}
             />
           </Stack>
-
-          <FloatingCartBar />
         </AuthGate>
-
+        {/* FloatingCartBar outside Stack so it overlays all screens properly */}
+        <FloatingCartBar />
         <StatusBar style="auto" />
       </ThemeProvider>
     </CartProvider>
   );
 }
 
-// ── Root — AuthProvider wraps everything ─────────────────────────────
 export default function RootLayout() {
   return (
     <SafeAreaProvider>

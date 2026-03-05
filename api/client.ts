@@ -8,6 +8,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 
+import { setupCartInterceptor } from '@/api/cart-interceptor';
 import { AppConfig } from '@/config/app.config';
 
 const baseURL = `${AppConfig.API_BASE_URL.replace(/\/$/, '')}${AppConfig.WC_API_PATH}`;
@@ -45,6 +46,9 @@ function createClient(): AxiosInstance {
       return Promise.reject(error);
     }
   );
+
+  // Auto-refresh CartContext after any cart mutation
+  setupCartInterceptor(client);
 
   return client;
 }

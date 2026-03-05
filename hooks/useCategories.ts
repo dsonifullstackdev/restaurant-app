@@ -17,7 +17,7 @@ export function useCategories() {
     setError(null);
     try {
       const data = await fetchCategories({ per_page: 100, hide_empty: true });
-      console.log("CATEGORY-DAT", data)
+      // console.log("CATEGORY-DAT", data)
       setCategories(data);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));

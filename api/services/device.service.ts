@@ -31,11 +31,11 @@ export async function initDevice(
     fingerprint
   );
 
-  // Persist to AsyncStorage (SharedPreferences equivalent in RN)
+  // Persist to AsyncStorage — always stringify, server may return numbers
   await AsyncStorage.multiSet([
-    [KEYS.RECORD_ID, data.record_id ?? ''],
+    [KEYS.RECORD_ID, String(data.record_id ?? '')],
     [KEYS.MATCH_SCORE, String(data.match_score ?? 0)],
-    [KEYS.OFFERS_ELIGIBLE, JSON.stringify(Boolean(data.offersEligible))], // converts 1→true, 0→false
+    [KEYS.OFFERS_ELIGIBLE, String(data.offersEligible ?? false)],
   ]);
 
   console.log('[Device stored] record_id:', data.record_id, '| match_score:', data.match_score);
@@ -73,7 +73,7 @@ export async function isOffersEligible(): Promise<boolean> {
   if (raw !== null) {
     try { return JSON.parse(raw); } catch { /* fall through */ }
   }
-  // Fallback if not stored yet
+  // Fallback: derive from match score
   const score = await getMatchScore();
   return score < 35;
 }

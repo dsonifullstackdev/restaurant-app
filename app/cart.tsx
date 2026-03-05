@@ -1,8 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -27,11 +26,10 @@ export default function CartScreen() {
   const text = useThemeColor({}, 'text');
   const icon = useThemeColor({}, 'icon');
 
-  const { items, totals, totalItems, loading, updateItem, refreshCart } = useCart();
-
-  useEffect(() => {
-    refreshCart();
-  }, []);
+  // loadingKeys = which item keys are currently being updated
+  const { items, totals, totalItems, loadingKeys, updateItem } = useCart();
+  // ↑ removed: loading, refreshCart
+  // ↑ removed: useEffect(() => { refreshCart() }, []) ← this caused full-screen reload
 
   const handleIncrease = useCallback(
     async (key: string) => {
@@ -45,24 +43,22 @@ export default function CartScreen() {
     async (key: string) => {
       const item = items.find((i) => i.key === key);
       if (!item) return;
-      await updateItem(key, item.quantity - 1); // 0 = remove handled in context
+      await updateItem(key, item.quantity - 1); // 0 = remove, handled in context
     },
     [items, updateItem]
   );
 
   const handlePlaceOrder = useCallback(() => {
-    router.push('/Checkout');
+    router.push('/checkout');
   }, [router]);
 
   // ── Empty state ────────────────────────────────────────────────────
-  if (!loading && items.length === 0) {
+  if (items.length === 0) {
     return (
       <View style={[styles.centered, { backgroundColor: background }]}>
         <MaterialIcons name="shopping-cart" size={72} color={icon} />
         <ThemedText style={styles.emptyTitle}>Your cart is empty</ThemedText>
-        <ThemedText style={styles.emptySubtitle}>
-          Add items to get started
-        </ThemedText>
+        <ThemedText style={styles.emptySubtitle}>Add items to get started</ThemedText>
         <TouchableOpacity style={styles.browseBtn} onPress={() => router.back()}>
           <ThemedText style={styles.browseBtnText}>Browse Menu</ThemedText>
         </TouchableOpacity>
@@ -75,13 +71,9 @@ export default function CartScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: background }]}>
-      {/* ── Header ── */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: surface, paddingTop: insets.top + Spacing.sm },
-        ]}
-      >
+
+      {/* ── Header — totalItems updates instantly via optimistic state ── */}
+      <View style={[styles.header, { backgroundColor: surface, paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <MaterialIcons name="arrow-back" size={24} color={icon} />
         </TouchableOpacity>
@@ -96,76 +88,48 @@ export default function CartScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E8445A" />
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        >
-          {/* ── Cart Items ── */}
-          <View style={[styles.section, { backgroundColor: surface }]}>
-            {items.map((item, index) => (
-              <View key={item.key}>
-                <CartItemRow
-                  item={item}
-                  onIncrease={handleIncrease}
-                  onDecrease={handleDecrease}
-                />
-                {index < items.length - 1 && (
-                  <View style={styles.divider} />
-                )}
-              </View>
-            ))}
-
-            {/* Add note */}
-            <View
-              style={[
-                styles.noteRow,
-                { borderTopColor: 'rgba(0,0,0,0.06)' },
-              ]}
-            >
-              <MaterialIcons name="edit-note" size={18} color={icon} />
-              <TextInput
-                style={[styles.noteInput, { color: text }]}
-                placeholder="Add a note for the restaurant"
-                placeholderTextColor={icon}
+      {/* ── ScrollView always visible — never replaced by spinner ── */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+      >
+        <View style={[styles.section, { backgroundColor: surface }]}>
+          {items.map((item, index) => (
+            <View key={item.key}>
+              <CartItemRow
+                item={item}
+                onIncrease={handleIncrease}
+                onDecrease={handleDecrease}
+                isUpdating={loadingKeys.has(item.key)}
               />
+              {index < items.length - 1 && <View style={styles.divider} />}
             </View>
+          ))}
+
+          <View style={[styles.noteRow, { borderTopColor: 'rgba(0,0,0,0.06)' }]}>
+            <MaterialIcons name="edit-note" size={18} color={icon} />
+            <TextInput
+              style={[styles.noteInput, { color: text }]}
+              placeholder="Add a note for the restaurant"
+              placeholderTextColor={icon}
+            />
           </View>
+        </View>
 
-          <View style={styles.spacer} />
-
-          {/* ── Bill Summary ── */}
-          {totals && <BillSummary totals={totals} />}
-        </ScrollView>
-      )}
+        <View style={styles.spacer} />
+        {totals && <BillSummary totals={totals} />}
+      </ScrollView>
 
       {/* ── Place Order Footer ── */}
-      {!loading && items.length > 0 && totals && (
-        <View
-          style={[
-            styles.footer,
-            {
-              paddingBottom: insets.bottom + Spacing.md,
-              backgroundColor: surface,
-            },
-          ]}
-        >
+      {totals && (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md, backgroundColor: surface }]}>
           <View style={styles.footerLeft}>
             <ThemedText style={styles.footerTotal}>
               {formatPrice(totals.total_price, minor, symbol)}
             </ThemedText>
             <ThemedText style={styles.footerLabel}>TOTAL</ThemedText>
           </View>
-
-          <TouchableOpacity
-            style={styles.placeOrderBtn}
-            onPress={handlePlaceOrder}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder} activeOpacity={0.85}>
             <ThemedText style={styles.placeOrderText}>Place Order</ThemedText>
             <MaterialIcons name="chevron-right" size={22} color="#fff" />
           </TouchableOpacity>
@@ -178,89 +142,54 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.xl,
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    gap: Spacing.md, padding: Spacing.xl,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    gap: Spacing.md,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md,
+    gap: Spacing.md, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 4,
   },
   headerTitle: { flex: 1 },
   headerText: { fontSize: 17, fontWeight: '700' },
   headerCount: { fontSize: 13, opacity: 0.55 },
   addMore: { fontSize: 14, fontWeight: '600', color: '#E8445A' },
   section: {
-    borderRadius: BorderRadius.xl,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-    overflow: 'hidden',
+    borderRadius: BorderRadius.xl, marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg, overflow: 'hidden',
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    marginHorizontal: Spacing.lg,
-  },
+  divider: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginHorizontal: Spacing.lg },
   noteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    gap: Spacing.sm,
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.md, borderTopWidth: 1, gap: Spacing.sm,
   },
   noteInput: { flex: 1, fontSize: 13 },
   spacer: { height: Spacing.lg },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md,
+    elevation: 10, shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 8,
   },
   footerLeft: { flex: 1 },
   footerTotal: { fontSize: 18, fontWeight: '800' },
   footerLabel: { fontSize: 11, opacity: 0.5, letterSpacing: 0.5 },
   placeOrderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8445A',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    gap: Spacing.xs,
-    elevation: 6,
-    shadowColor: '#E8445A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8445A',
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl, gap: Spacing.xs, elevation: 6,
+    shadowColor: '#E8445A', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 8,
   },
   placeOrderText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptySubtitle: { fontSize: 14, opacity: 0.6 },
   browseBtn: {
-    backgroundColor: '#E8445A',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    marginTop: Spacing.sm,
+    backgroundColor: '#E8445A', paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md, borderRadius: BorderRadius.xl, marginTop: Spacing.sm,
   },
   browseBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

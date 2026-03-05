@@ -1,9 +1,9 @@
-import { t } from '@/i18n';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  AppState,
   Image,
   StyleSheet,
   TouchableOpacity,
@@ -14,39 +14,68 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { useCart } from '@/context/CartContext';
+import { formatPrice } from '@/utils/price';
+
+// Screens where the bar should not appear
+const HIDE_ON = ['cart', 'checkout', 'order-success', 'login', 'otp', 'onboarding', 'service-unavailable'];
 
 export function FloatingCartBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { items, totalItems, totalPrice } = useCart();
-  const slideAnim = useRef(new Animated.Value(100)).current;
+  const segments = useSegments();
+  const { items, totals, totalItems, refreshCart } = useCart();
 
-  const hasItems = totalItems > 0;
+  const slideAnim = useRef(new Animated.Value(80)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  // Current screen — last segment
+  const currentScreen = (segments[segments.length - 1] ?? '') as string;
+  const shouldHide = HIDE_ON.includes(currentScreen);
+  const visible = totalItems > 0 && !shouldHide;
 
-  // Slide up when items added, slide down when cart empty
+  // Animate whenever visibility changes (items added OR screen changes)
   useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: hasItems ? 0 : 100,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 12,
-    }).start();
-  }, [hasItems]);
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: visible ? 0 : 80,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 12,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: visible ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [visible]); // visible = totalItems > 0 && !shouldHide
 
-  if (!hasItems) return null;
+  // Refresh on app foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshCart();
+    });
+    return () => sub.remove();
+  }, [refreshCart]);
 
-  // Show max 2 product images
-  const previewImages = items.slice(0, 2).map((i) => i.images?.[0]?.src).filter(Boolean);
+  const previewImages = (items ?? [])
+    .slice(0, 2)
+    .map((i) => i.images?.[0]?.thumbnail ?? i.images?.[0]?.src)
+    .filter(Boolean) as string[];
 
-  // Format price (WooCommerce returns price in minor units e.g. 49900 = ₹499)
-  const formattedPrice = `₹${(parseInt(totalPrice) / 100).toFixed(0)}`;
+  const minor = totals?.currency_minor_unit ?? 2;
+  const symbol = totals?.currency_symbol ?? '₹';
+  const formattedTotal = totals ? formatPrice(totals.total_price, minor, symbol) : '';
+
+  const bottomOffset = insets.bottom;
 
   return (
     <Animated.View
+      pointerEvents={visible ? 'auto' : 'none'}
       style={[
         styles.wrapper,
         {
-          bottom: insets.bottom + Spacing.lg,
+          bottom: bottomOffset,
+          opacity: opacityAnim,
           transform: [{ translateY: slideAnim }],
         },
       ]}
@@ -56,28 +85,29 @@ export function FloatingCartBar() {
         onPress={() => router.push('/cart')}
         activeOpacity={0.9}
       >
-        {/* Left — product image previews */}
-        <View style={styles.images}>
-          {previewImages.map((src, index) => (
-            <Image
-              key={index}
-              source={{ uri: src }}
-              style={[
-                styles.previewImage,
-                { marginLeft: index > 0 ? -10 : 0 },
-              ]}
-            />
-          ))}
+        {previewImages.length > 0 && (
+          <View style={styles.images}>
+            {previewImages.map((src, index) => (
+              <Image
+                key={index}
+                source={{ uri: src }}
+                style={[styles.previewImage, { marginLeft: index > 0 ? -10 : 0 }]}
+              />
+            ))}
+          </View>
+        )}
+
+        <View style={styles.center}>
+          <ThemedText style={styles.label}>
+            {totalItems} {totalItems === 1 ? 'item' : 'items'} added
+          </ThemedText>
+          {!!formattedTotal && (
+            <ThemedText style={styles.total}>{formattedTotal}</ThemedText>
+          )}
         </View>
 
-        {/* Center — item count */}
-        <ThemedText style={styles.label}>
-          {totalItems} {totalItems === 1 ? 'item' : 'items'} added
-        </ThemedText>
-
-        {/* Right — view cart */}
         <View style={styles.right}>
-          <ThemedText style={styles.viewCart}>{t('cart.view_cart')}</ThemedText>
+          <ThemedText style={styles.viewCart}>View cart</ThemedText>
           <MaterialIcons name="chevron-right" size={20} color="#fff" />
         </View>
       </TouchableOpacity>
@@ -90,7 +120,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: Spacing.lg,
     right: Spacing.lg,
-    zIndex: 999,
+    zIndex: 9999,
+    elevation: 9999,
   },
   bar: {
     flexDirection: 'row',
@@ -100,16 +131,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
-    shadowColor: '#E8445A',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 12,
   },
-  images: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  images: { flexDirection: 'row', alignItems: 'center' },
   previewImage: {
     width: 36,
     height: 36,
@@ -117,20 +145,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  label: {
-    flex: 1,
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  viewCart: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  center: { flex: 1, gap: 2 },
+  label: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  total: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500' },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewCart: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

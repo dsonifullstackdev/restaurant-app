@@ -25,7 +25,7 @@ export function useBanners(params?: UseBannersParams) {
         per_page: params?.per_page ?? 10,
         banner_pos: params?.banner_pos,
       });
-      console.log('BANNER-RESP-DAT', data);
+      // console.log('BANNER-RESP-DAT', data);
       setBanners(data);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));

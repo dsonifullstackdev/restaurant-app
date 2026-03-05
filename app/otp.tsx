@@ -143,21 +143,37 @@ export default function OtpScreen() {
       });
 
       if (response.success && response.token) {
-        // Build AuthUser from OTP response
+        const u = response.user;
+        const p = response.profile;
+
+        // wp_user_id present & non-empty = existing user
+        const isExistingUser = !!(u?.user_id && u.user_id !== '');
+
+        // Build AuthUser from response
         const authUser: AuthUser = {
-          id: response.user_id ?? 0,
-          email: response.email ?? '',
-          firstName: response.first_name ?? '',
-          lastName: response.last_name ?? '',
-          displayName: response.display_name ?? `+91-${mobile}`,
+          id: isExistingUser ? parseInt(u!.user_id, 10) : 0,
+          email: u?.email ?? '',
+          firstName: u?.first_name ?? '',
+          lastName: u?.last_name ?? '',
+          displayName: u ? `${u.first_name} ${u.last_name}`.trim() || `+91-${mobile}` : `+91-${mobile}`,
           token: response.token,
-          phone: mobile,
+          phone: u?.phone ?? mobile,
         };
 
-        // ✅ This sets user in AuthContext + persists to AsyncStorage
-        // AuthGate sees isLoggedIn=true → allows navigation to (tabs)
+        // Persist to AsyncStorage + set in AuthContext
         await loginWithToken(authUser);
-        router.replace('/(tabs)');
+
+        // Existing user with completed profile → go to app
+        // New user OR profile incomplete → go to onboarding (pre-fill if profile exists)
+        const hasProfile = !!(p?.address && p?.city && p?.postal_code && p?.diet_pill);
+
+        if (isExistingUser && hasProfile) {
+          setTimeout(() => router.replace('/(tabs)'), 100);
+        } else {
+          // Pass profile data to onboarding so fields are pre-filled
+          const params = p ? `?address=${encodeURIComponent(p.address ?? '')}&city=${encodeURIComponent(p.city ?? '')}&postal_code=${encodeURIComponent(p.postal_code ?? '')}&diet_pill=${encodeURIComponent(p.diet_pill ?? '')}&food_categories=${encodeURIComponent(JSON.stringify(p.food_categories ?? []))}&dietary_category_id=${encodeURIComponent(p.dietary_category_id ?? '')}&whatsapp_updates=${p.whatsapp_updates ?? true}` : '';
+          setTimeout(() => router.replace(`/onboarding${params}` as any), 100);
+        }
       } else {
         setError(response.message ?? 'Invalid OTP. Please try again.');
         setOtp(Array(OTP_LENGTH).fill(''));

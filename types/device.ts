@@ -27,12 +27,12 @@ export type DeviceFingerprint = {
 
 export type DeviceInitResponse = {
   // ── Core fields returned by server ──────────────────────────────
-  record_id: string;    // stable server-assigned ID for this device
-  match_score: number;  // 0-100, higher = more likely returning user
+  record_id: string | number;  // server returns number, stringified on store
+  match_score: number;
+  offersEligible?: number | boolean;  // server returns 1/0
   // ── Optional enriched fields ─────────────────────────────────────
   isNewUser?: boolean;
   isReturningUser?: boolean;
-  offersEligible: 0 | 1;
-  matchedSignals: string;
+  matchedSignals?: string[];
   message?: string;
 };

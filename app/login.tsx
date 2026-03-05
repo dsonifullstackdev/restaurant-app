@@ -1,5 +1,5 @@
+import { safeShowPhoneNumberHint } from '@/utils/phone-hint';
 import { MaterialIcons } from '@expo/vector-icons';
-import { showPhoneNumberHint } from '@shayrn/react-native-android-phone-number-hint';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -54,20 +54,26 @@ export default function LoginScreen() {
 
   // ── Phone ref — always has latest value for fingerprint ──────────
   const phoneRef = useRef('');
-  const handleSetPhone = (val: string) => {
+  const initRan = useRef(false); // guard: phone hint runs only once
+  const handleSetPhone = useCallback((val: string) => {
     phoneRef.current = val;
     setPhone(val);
-  };
+  }, []);
 
   const tabAnim = useRef(new Animated.Value(0)).current;
 
   // ── On mount: auto-detect phone + send init fingerprint ──────────
   useEffect(() => {
+    if (initRan.current) return;
+    initRan.current = true;
+
     const init = async () => {
-      let detectedPhone = '';
-      if (Platform.OS === 'android') {
-        try {
-          const raw = await showPhoneNumberHint();
+  let detectedPhone = '';
+  if (Platform.OS === 'android') {
+    try {
+      // Wait for activity to fully resume before requesting phone hint
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const raw = await safeShowPhoneNumberHint();
           if (raw) {
             detectedPhone = stripCountryCode(raw);
             handleSetPhone(detectedPhone);
@@ -79,7 +85,7 @@ export default function LoginScreen() {
       sendFingerprint('init_request', detectedPhone || undefined);
     };
     init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Send fingerprint ─────────────────────────────────────────────
   const sendFingerprint = useCallback(async (
@@ -109,7 +115,7 @@ export default function LoginScreen() {
   const handleAutoDetect = useCallback(async () => {
     if (Platform.OS !== 'android') return;
     try {
-      const raw = await showPhoneNumberHint();
+      const raw = await safeShowPhoneNumberHint();
       if (raw) handleSetPhone(stripCountryCode(raw));
     } catch {}
   }, []);
@@ -151,10 +157,9 @@ export default function LoginScreen() {
           screen_resolution: fingerprint.screenResolution,
           android_id: fingerprint.androidId,
         });
-        console.log('[OTP sent] for phone:', phone.trim());
+
         // Navigate to OTP screen passing mobile number
         router.push(`/otp?mobile=${encodeURIComponent(phone.trim())}`);
-
       } catch (err: any) {
         const msg = err?.response?.data?.message ?? 'Failed to send OTP. Try again.';
         setError(msg);
