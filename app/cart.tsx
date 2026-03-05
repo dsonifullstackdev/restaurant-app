@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   BackHandler,
   ScrollView,
@@ -31,6 +31,18 @@ export default function CartScreen() {
   const { items, totals, totalItems, loadingKeys, updateItem } = useCart();
   // ↑ removed: loading, refreshCart
   // ↑ removed: useEffect(() => { refreshCart() }, []) ← this caused full-screen reload
+
+  // ── Auto-go home when last item removed ─────────────────────────
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (items.length === 0) {
+      router.replace('/(tabs)');
+    }
+  }, [items.length]);
 
   const handleIncrease = useCallback(
     async (key: string) => {
@@ -67,13 +79,22 @@ export default function CartScreen() {
   // ── Empty state ────────────────────────────────────────────────────
   if (items.length === 0) {
     return (
-      <View style={[styles.centered, { backgroundColor: background }]}>
-        <MaterialIcons name="shopping-cart" size={72} color={icon} />
-        <ThemedText style={styles.emptyTitle}>Your cart is empty</ThemedText>
-        <ThemedText style={styles.emptySubtitle}>Add items to get started</ThemedText>
-        <TouchableOpacity style={styles.browseBtn} onPress={() => router.back()}>
-          <ThemedText style={styles.browseBtnText}>Browse Menu</ThemedText>
-        </TouchableOpacity>
+      <View style={[styles.root, { backgroundColor: background }]}>
+        <View style={[styles.header, { backgroundColor: surface, paddingTop: insets.top + Spacing.sm }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/(tabs)')} hitSlop={8}>
+            <MaterialIcons name="arrow-back" size={22} color={icon} />
+          </TouchableOpacity>
+          <ThemedText style={styles.headerText}>Your Cart</ThemedText>
+          <View style={styles.backBtn} />
+        </View>
+        <View style={[styles.centered, { backgroundColor: background }]}>
+          <MaterialIcons name="shopping-cart" size={72} color={icon} style={{ opacity: 0.3 }} />
+          <ThemedText style={styles.emptyTitle}>Your cart is empty</ThemedText>
+          <ThemedText style={styles.emptySubtitle}>Add items to get started</ThemedText>
+          <TouchableOpacity style={styles.browseBtn} onPress={() => router.replace('/(tabs)')}>
+            <ThemedText style={styles.browseBtnText}>Browse Menu</ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -82,12 +103,12 @@ export default function CartScreen() {
   const symbol = totals?.currency_symbol ?? '₹';
 
   return (
-    <View style={[styles.container, { backgroundColor: background }]}>
+    <View style={[styles.root, { backgroundColor: background }]}>
 
-      {/* ── Header — totalItems updates instantly via optimistic state ── */}
+      {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: surface, paddingTop: insets.top + Spacing.sm }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <MaterialIcons name="arrow-back" size={24} color={icon} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/(tabs)')} hitSlop={8}>
+          <MaterialIcons name="arrow-back" size={22} color={icon} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <ThemedText style={styles.headerText}>Your Cart</ThemedText>
@@ -95,8 +116,9 @@ export default function CartScreen() {
             {totalItems} {totalItems === 1 ? 'item' : 'items'}
           </ThemedText>
         </View>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.addMore}>+ Add more</ThemedText>
+        <TouchableOpacity style={styles.addMoreBtn} onPress={() => router.replace('/(tabs)')}>
+          <MaterialIcons name="add" size={16} color="#E8445A" />
+          <ThemedText style={styles.addMore}>Add more</ThemedText>
         </TouchableOpacity>
       </View>
 
@@ -152,6 +174,7 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1 },
   centered: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
@@ -164,10 +187,16 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 4,
   },
-  headerTitle: { flex: 1 },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  headerTitle: { flex: 1, alignItems: 'center' },
   headerText: { fontSize: 17, fontWeight: '700' },
-  headerCount: { fontSize: 13, opacity: 0.55 },
-  addMore: { fontSize: 14, fontWeight: '600', color: '#E8445A' },
+  headerCount: { fontSize: 12, opacity: 0.45, marginTop: 1 },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  addMore: { fontSize: 13, fontWeight: '600', color: '#E8445A' },
   section: {
     borderRadius: BorderRadius.xl, marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg, overflow: 'hidden',
