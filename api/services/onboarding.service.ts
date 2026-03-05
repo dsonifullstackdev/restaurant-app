@@ -35,6 +35,36 @@ export type UpdateProfileResponse = {
   user?: UpdateProfileUser;
 };
 
+export type GetProfileResponse = {
+  success: boolean;
+  user?: {
+    wp_user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
+  profile?: {
+    address?: string;
+    city?: string;
+    postal_code?: string;
+    diet_pill?: string;
+    food_categories?: number[];
+    dietary_category_id?: string;
+    whatsapp_updates?: boolean;
+    name?: string;
+    email?: string;
+  };
+};
+
+export async function getProfile(token: string, recordId: string): Promise<GetProfileResponse> {
+  const { data } = await apiClient.post<GetProfileResponse>(
+    Endpoints.GET_PROFILE,
+    { token, record_id: recordId }
+  );
+  return data;
+}
+
 export async function updateProfile(
   payload: UpdateProfilePayload
 ): Promise<UpdateProfileResponse> {

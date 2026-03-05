@@ -183,9 +183,15 @@ export default function OnboardingScreen() {
 
       // Persist prefs locally (SharedPreferences equivalent)
       await AsyncStorage.setItem(PREFS_KEY, JSON.stringify({
+        name: nameRef.current.trim(),
+        email: emailRef.current.trim(),
+        address: addressRef.current.trim(),
+        city: cityRef.current.trim(),
+        postal_code: postalCodeRef.current.trim(),
         dietary: selectedDiet!.slug,
         dietaryId: selectedDiet!.id,
         selectedItems,
+        whatsapp_updates: whatsappUpdates,
       }));
 
       const response = await updateProfile({
