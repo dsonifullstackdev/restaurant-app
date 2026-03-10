@@ -143,15 +143,21 @@ export default function OtpScreen() {
       });
 
       if (response.success && response.token) {
+        // ── DEBUG: inspect token shape ──────────────────────────────
+        const segments = response.token.split('.').length;
+        console.log('[OTP] token segments:', segments);
+        console.log('[OTP] token preview:', response.token.substring(0, 60) + '...');
+        console.log('[OTP] full response:', JSON.stringify(response, null, 2));
+        // ── END DEBUG ────────────────────────────────────────────────
         const u = response.user;
         const p = response.profile;
 
         // wp_user_id present & non-empty = existing user
-        const isExistingUser = !!(u?.user_id && u.user_id !== '');
+        const isExistingUser = !!(u?.wp_user_id && u.wp_user_id !== '');
 
         // Build AuthUser from response
         const authUser: AuthUser = {
-          id: isExistingUser ? parseInt(u!.user_id, 10) : 0,
+          id: isExistingUser ? parseInt(u!.wp_user_id, 10) : 0,
           email: u?.email ?? '',
           firstName: u?.first_name ?? '',
           lastName: u?.last_name ?? '',

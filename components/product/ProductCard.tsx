@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import { useCart } from '@/context/CartContext';
@@ -34,6 +35,7 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
   const icon = useThemeColor({}, 'icon');
 
   const { addItem } = useCart();
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const imageUrl = getProductImageUrl(product);
   const salePrice = formatPrice(product.prices?.sale_price);
@@ -49,12 +51,11 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
         )
       : null;
 
-  const handleAddToCart = async () => {
-    await addItem(product.id, 1);
-  };
+  const handleAddToCart = () => setSheetVisible(true);
 
   return (
-    <Pressable style={[styles.card, { backgroundColor: surface }]} onPress={onPress}>
+    <>
+    <Pressable style={[styles.card, { backgroundColor: surface }]} onPress={() => setSheetVisible(true)}>
       {/* LEFT CONTENT */}
       <View style={styles.body}>
         <ThemedText style={[styles.name, { color: text }]} type="defaultSemiBold" numberOfLines={1}>
@@ -99,6 +100,12 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
         </Pressable>
       </View>
     </Pressable>
+    <ProductDetailSheet
+      product={product}
+      visible={sheetVisible}
+      onClose={() => setSheetVisible(false)}
+    />
+    </>
   );
 }
 

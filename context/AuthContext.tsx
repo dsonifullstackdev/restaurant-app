@@ -12,6 +12,7 @@ import React, {
   useState,
 } from 'react';
 
+import { setAuthToken } from '@/api/client';
 import {
   clearAuth,
   getStoredToken,
@@ -46,6 +47,11 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ── Sync JWT into apiClient whenever user changes ───────────────
+  useEffect(() => {
+    setAuthToken(user?.token ?? null);
+  }, [user]);
 
   // ── Check stored token on app launch ────────────────────────────
   useEffect(() => {

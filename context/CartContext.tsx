@@ -69,6 +69,7 @@ type CartContextType = {
   totalItems: number;
   loading: boolean;           // true only on initial load
   loadingKeys: Set<string>;   // keys of items currently being updated
+  paymentMethods: string[];   // e.g. ["cod", "razorpay"] from cart response
   addItem: (productId: number, quantity?: number) => Promise<void>;
   removeItem: (key: string) => Promise<void>;
   updateItem: (key: string, quantity: number) => Promise<void>;
@@ -85,6 +86,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(false);  // initial load only
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
   // ── Helpers for per-item loading state ───────────────────────────
   const addLoadingKey = useCallback((key: string) => {
@@ -107,6 +109,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems(cartItems);
       setTotals(data?.totals ?? null);
       setTotalItems(cartItems.reduce((sum: number, i: CartItem) => sum + i.quantity, 0));
+      setPaymentMethods(data?.payment_methods ?? []);
     } catch (err) {
       console.log('Cart refresh error:', err);
     }
@@ -187,6 +190,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         totalItems,
         loading,
         loadingKeys,
+        paymentMethods,
         addItem,
         removeItem,
         updateItem,

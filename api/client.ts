@@ -14,9 +14,14 @@ import { AppConfig } from '@/config/app.config';
 const baseURL = `${AppConfig.API_BASE_URL.replace(/\/$/, '')}${AppConfig.WC_API_PATH}`;
 
 let cartToken: string | null = null;
+let authToken: string | null = null;
 
 export const setCartToken = (token: string | null) => {
   cartToken = token;
+};
+
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
 };
 
 function createClient(): AxiosInstance {
@@ -35,6 +40,15 @@ function createClient(): AxiosInstance {
     (config: InternalAxiosRequestConfig) => {
       if (cartToken && config.headers) {
         config.headers.set('Cart-Token', cartToken);
+      }
+      if (authToken && config.headers) {
+        // Only send if it looks like a real JWT (3 dot-separated segments)
+        const isJwt = authToken.split('.').length === 3;
+        if (isJwt) {
+          config.headers.set('Authorization', `Bearer ${authToken}`);
+        } else {
+          console.warn('[apiClient] Token is not a valid JWT — skipping Authorization header. Segments:', authToken.split('.').length);
+        }
       }
       return config;
     }
